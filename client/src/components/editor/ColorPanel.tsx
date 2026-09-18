@@ -89,6 +89,11 @@ export function ColorPanel() {
           </button>
         ))}
       </div>
+      <div className="brush-custom">
+        <input type="range" min={1} max={64} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} title="Cỡ nét tùy chỉnh (1–64)" />
+        <input type="number" className="num-input" min={1} max={64} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} />
+        <span className="muted small">px</span>
+      </div>
 
       {tab === "swatches" ? (
         <>

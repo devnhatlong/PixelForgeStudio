@@ -163,7 +163,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
   setSecondary: (color) => set({ secondary: color }),
   swapColors: () => set((s) => ({ primary: s.secondary, secondary: s.primary })),
-  setBrushSize: (n) => set({ brushSize: Math.max(1, Math.min(4, n)) }),
+  setBrushSize: (n) => set({ brushSize: Math.max(1, Math.min(64, Math.round(n) || 1)) }),
   setMirror: (m) => set({ mirror: m }),
   setZoom: (z) => set({ zoom: Math.max(1, Math.min(64, z)) }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
