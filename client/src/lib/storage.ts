@@ -1,11 +1,12 @@
-import type { PixelDocument, ProjectSummary } from "@/types/editor";
+import type { Folder, PixelDocument, ProjectSummary } from "@/types/editor";
 import { makeThumbnail } from "./raster";
-import { normalizeDocument } from "./document";
+import { normalizeDocument, uid } from "./document";
 
 const DB_NAME = "pixelforge";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_PROJECTS = "projects";
 const STORE_DOCS = "documents";
+const STORE_FOLDERS = "folders";
 
 interface StoredDoc {
   id: string;
@@ -20,6 +21,7 @@ function openDb(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_PROJECTS)) db.createObjectStore(STORE_PROJECTS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(STORE_DOCS)) db.createObjectStore(STORE_DOCS, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_FOLDERS)) db.createObjectStore(STORE_FOLDERS, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -38,6 +40,8 @@ function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) 
   );
 }
 
+/* ---------------- projects ---------------- */
+
 export async function saveProject(doc: PixelDocument, extra?: Partial<ProjectSummary>): Promise<ProjectSummary> {
   const existing = await getSummary(doc.id);
   const summary: ProjectSummary = {
@@ -51,6 +55,7 @@ export async function saveProject(doc: PixelDocument, extra?: Partial<ProjectSum
     thumbnail: makeThumbnail(doc),
     updatedAt: Date.now(),
     deleted: extra?.deleted ?? existing?.deleted ?? false,
+    folderId: extra?.folderId !== undefined ? extra.folderId : existing?.folderId ?? null,
   };
   await tx(STORE_DOCS, "readwrite", (s) => s.put({ id: doc.id, doc } satisfies StoredDoc));
   await tx(STORE_PROJECTS, "readwrite", (s) => s.put(summary));
@@ -88,4 +93,39 @@ export async function updateSummary(id: string, patch: Partial<ProjectSummary>):
   const summary = await getSummary(id);
   if (!summary) return;
   await tx(STORE_PROJECTS, "readwrite", (s) => s.put({ ...summary, ...patch }));
+}
+
+export async function moveProject(id: string, folderId: string | null): Promise<void> {
+  await updateSummary(id, { folderId });
+}
+
+/* ---------------- folders ---------------- */
+
+export async function listFolders(): Promise<Folder[]> {
+  const all = await tx<Folder[]>(STORE_FOLDERS, "readonly", (s) => s.getAll());
+  return all.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+}
+
+export async function getFolder(id: string): Promise<Folder | undefined> {
+  return tx<Folder | undefined>(STORE_FOLDERS, "readonly", (s) => s.get(id));
+}
+
+export async function createFolder(name: string): Promise<Folder> {
+  const now = Date.now();
+  const folder: Folder = { id: uid("fd"), name: name.trim() || "Thư mục mới", createdAt: now, updatedAt: now };
+  await tx(STORE_FOLDERS, "readwrite", (s) => s.put(folder));
+  return folder;
+}
+
+export async function renameFolder(id: string, name: string): Promise<void> {
+  const f = await getFolder(id);
+  if (!f) return;
+  await tx(STORE_FOLDERS, "readwrite", (s) => s.put({ ...f, name: name.trim() || f.name, updatedAt: Date.now() }));
+}
+
+/** Delete a folder; its projects are moved back to the root. */
+export async function deleteFolder(id: string): Promise<void> {
+  const projects = await listProjects();
+  for (const p of projects) if (p.folderId === id) await updateSummary(p.id, { folderId: null });
+  await tx(STORE_FOLDERS, "readwrite", (s) => s.delete(id));
 }

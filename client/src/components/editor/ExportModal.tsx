@@ -8,6 +8,7 @@ import { downloadBlob, safeName } from "@/lib/pforge";
 import { computeSheetGrid, exportFramesZip, exportGif, exportPng, exportSpriteSheet, type Background, type SheetLayout } from "@/lib/export";
 import { Download, FolderArchive, Film, Image, Info, LayoutGrid, type LucideIcon } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Loading";
 
 type Tab = "png" | "zip" | "gif" | "sheet";
 
@@ -152,9 +153,10 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               <button
                 className="btn-primary big"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={() => run(async () => downloadBlob(await exportPng(doc, pngFrame, pngScale, pngBg), `${name}_frame${pngFrame + 1}_${pngScale}x.png`))}
               >
-                <Download size={15} /> Tải Xuống 1 Frame PNG ({pngScale}x)
+                {busy ? <Spinner size={15} /> : <Download size={15} />} Tải Xuống 1 Frame PNG ({pngScale}x)
               </button>
             </>
           )}
@@ -169,8 +171,8 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               <ScalePicker value={zipScale} onChange={setZipScale} options={[1, 2, 4, 8, 16]} />
               <label className="field-label">Nền từng khung hình:</label>
               <BgPicker value={zipBg} onChange={setZipBg} />
-              <button className="btn-primary big" disabled={busy} onClick={() => run(async () => downloadBlob(await exportFramesZip(doc, zipScale, zipBg), `${name}_frames.zip`))}>
-                <FolderArchive size={15} /> Tải Toàn Bộ {doc.frames.length} Khung Hình (.ZIP)
+              <button className="btn-primary big" disabled={busy} aria-busy={busy} onClick={() => run(async () => downloadBlob(await exportFramesZip(doc, zipScale, zipBg), `${name}_frames.zip`))}>
+                {busy ? <Spinner size={15} /> : <FolderArchive size={15} />} Tải Toàn Bộ {doc.frames.length} Khung Hình (.ZIP)
               </button>
             </>
           )}
@@ -183,8 +185,8 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               <ScalePicker value={gifScale} onChange={setGifScale} options={[1, 2, 4, 8, 16]} />
               <label className="field-label">Nền:</label>
               <BgPicker value={gifBg} onChange={setGifBg} />
-              <button className="btn-primary big" disabled={busy} onClick={() => run(async () => downloadBlob(await exportGif(doc, gifScale, gifBg, gifFps), `${name}_${gifScale}x.gif`))}>
-                <Film size={15} /> Tải Ảnh Động GIF ({gifScale}x)
+              <button className="btn-primary big" disabled={busy} aria-busy={busy} onClick={() => run(async () => downloadBlob(await exportGif(doc, gifScale, gifBg, gifFps), `${name}_${gifScale}x.gif`))}>
+                {busy ? <Spinner size={15} /> : <Film size={15} />} Tải Ảnh Động GIF ({gifScale}x)
               </button>
             </>
           )}
@@ -223,6 +225,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               <button
                 className="btn-primary big"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={() =>
                   run(async () => {
                     const r = await exportSpriteSheet(doc, { layout, columns, spacing, scale: sheetScale });
@@ -233,7 +236,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
                   })
                 }
               >
-                <Download size={15} /> Tải Sprite Sheet PNG + File JSON
+                {busy ? <Spinner size={15} /> : <Download size={15} />} Tải Sprite Sheet PNG + File JSON
               </button>
               <div className="muted small center">Tương thích Unity, Godot, Phaser, GameMaker & Web Engines</div>
             </>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageDown, ImageUp, Sparkles } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { LoadingBlock } from "@/components/ui/Loading";
 import { PALETTES } from "@/lib/palettes";
 import { imageToDocument, imageToPixels, loadImage } from "@/lib/png-to-pixel";
 import type { PixelDocument } from "@/types/editor";
@@ -16,6 +17,7 @@ export function PngToPixelModal({ onClose, onCreate }: { onClose: () => void; on
   const [paletteId, setPaletteId] = useState<string>("auto");
   const [alpha, setAlpha] = useState(128);
   const [preview, setPreview] = useState("");
+  const [reading, setReading] = useState(false);
 
   const dims = useMemo(() => {
     if (!img) return { width: size, height: size };
@@ -54,11 +56,14 @@ export function PngToPixelModal({ onClose, onCreate }: { onClose: () => void; on
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
+    setReading(true);
     try {
       setImg(await loadImage(file));
       setFileName(file.name.replace(/\.[^.]+$/, ""));
     } catch (e) {
       alert((e as Error).message);
+    } finally {
+      setReading(false);
     }
   };
 
@@ -73,7 +78,9 @@ export function PngToPixelModal({ onClose, onCreate }: { onClose: () => void; on
             onFile(e.dataTransfer.files[0]);
           }}
         >
-          {preview ? (
+          {reading ? (
+            <LoadingBlock label="Đang đọc ảnh…" />
+          ) : preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="preview" className="export-img" />
           ) : (

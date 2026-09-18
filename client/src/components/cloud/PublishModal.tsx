@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Store } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Loading";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { useEditorStore } from "@/store/editor-store";
@@ -58,8 +59,8 @@ export function PublishModal({ onClose }: { onClose: () => void }) {
       <textarea className="text-input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả ngắn về sprite này…" />
       <label className="field-label">Tags (cách nhau bằng dấu phẩy)</label>
       <input className="text-input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="cat, animal, rpg" />
-      <button className="btn-primary big" disabled={busy} onClick={publish}>
-        {busy ? "Đang đăng…" : <><Store size={15} /> Đăng lên Marketplace</>}
+      <button className="btn-primary big" disabled={busy} aria-busy={busy} onClick={publish}>
+        {busy ? <><Spinner size={15} /> Đang đăng…</> : <><Store size={15} /> Đăng lên Marketplace</>}
       </button>
     </Modal>
   );

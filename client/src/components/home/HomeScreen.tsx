@@ -7,11 +7,15 @@ import {
 } from "lucide-react";
 import { useAppStore, type HomeView } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
-import { deleteForever, listProjects, setDeleted } from "@/lib/storage";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createFolder, deleteFolder, deleteForever, listFolders, listProjects, moveProject, renameFolder, setDeleted } from "@/lib/storage";
+import { FolderBreadcrumb, FolderCard, NewFolderButton, RootDropZone } from "./FolderBar";
+import { STUDIO_PATH } from "@/hooks/useProjectActions";
 import { api, type CloudProject } from "@/lib/api";
 import { normalizeDocument, uid } from "@/lib/document";
 import { useProjectActions } from "@/hooks/useProjectActions";
-import type { PixelDocument, ProjectSummary } from "@/types/editor";
+import type { Folder, PixelDocument, ProjectSummary } from "@/types/editor";
+import { LoadingBlock, ProjectGridSkeleton, Spinner } from "@/components/ui/Loading";
 
 function timeAgo(ts: number) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -33,6 +37,7 @@ export function HomeScreen() {
   const setHomeView = useAppStore((s) => s.setHomeView);
   const openModal = useAppStore((s) => s.openModal);
   const user = useAuthStore((s) => s.user);
+  const authReady = useAuthStore((s) => s.ready);
   const logout = useAuthStore((s) => s.logout);
   const { pickPforge } = useProjectActions();
 
@@ -47,9 +52,11 @@ export function HomeScreen() {
     <div className="home">
       <aside className="home-sidebar">
         <div className="user-card">
-          <div className="avatar">{user ? user.name.slice(0, 1).toUpperCase() : <User size={16} />}</div>
-          <div className="user-name">{user ? user.name : "Chưa đăng nhập"}</div>
-          {user ? (
+          <div className="avatar">{!authReady ? <Spinner size={14} /> : user ? user.name.slice(0, 1).toUpperCase() : <User size={16} />}</div>
+          <div className="user-name">{!authReady ? "Đang kiểm tra phiên…" : user ? user.name : "Chưa đăng nhập"}</div>
+          {!authReady ? (
+            <button className="btn-ghost full" disabled aria-busy="true"><Spinner size={14} /> Đang tải</button>
+          ) : user ? (
             <button className="btn-ghost full" onClick={logout}>Đăng xuất</button>
           ) : (
             <button className="btn-primary full" onClick={() => openModal("auth")}>Đăng Nhập</button>
@@ -81,36 +88,53 @@ export function HomeScreen() {
 
 function useLocalProjects(deleted: boolean) {
   const [items, setItems] = useState<ProjectSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const refresh = useCallback(async () => {
     try {
       const all = await listProjects();
       setItems(all.filter((p) => !!p.deleted === deleted));
     } catch {
       setItems([]);
+    } finally {
+      setLoading(false);
     }
   }, [deleted]);
   useEffect(() => {
     refresh();
   }, [refresh]);
-  return { items, refresh };
+  return { items, refresh, loading };
 }
 
 function ProjectGrid({
   items,
   view,
+  loading,
+  draggable,
   onOpen,
   actions,
 }: {
   items: ProjectSummary[];
   view: "grid" | "list";
+  loading?: boolean;
+  draggable?: boolean;
   onOpen?: (p: ProjectSummary) => void;
   actions: (p: ProjectSummary) => React.ReactNode;
 }) {
+  if (loading) return <ProjectGridSkeleton />;
   if (!items.length) return <div className="empty">Chưa có project nào.</div>;
   return (
     <div className={view === "grid" ? "project-grid" : "project-list"}>
       {items.map((p) => (
-        <div key={p.id} className="project-card" onDoubleClick={() => onOpen?.(p)}>
+        <div
+          key={p.id}
+          className="project-card"
+          onDoubleClick={() => onOpen?.(p)}
+          draggable={draggable}
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/pf-project", p.id);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+        >
           <div className="project-thumb checker" onClick={() => onOpen?.(p)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {p.thumbnail && <img src={p.thumbnail} alt={p.name} />}
@@ -130,6 +154,7 @@ function ProjectGrid({
 
 function ListHeader({
   title,
+  extra,
   sort,
   setSort,
   desc,
@@ -139,7 +164,8 @@ function ListHeader({
   view,
   setView,
 }: {
-  title: string;
+  title: React.ReactNode;
+  extra?: React.ReactNode;
   sort: SortKey;
   setSort: (s: SortKey) => void;
   desc: boolean;
@@ -153,9 +179,12 @@ function ListHeader({
     <>
       <div className="home-head">
         <h1>{title}</h1>
+        <div className="head-actions">
+        {extra}
         <div className="seg">
           <button className={view === "list" ? "active" : ""} onClick={() => setView("list")} title="Danh sách"><List size={15} /></button>
           <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} title="Lưới"><LayoutGrid size={15} /></button>
+        </div>
         </div>
       </div>
       <div className="home-filter">
@@ -192,25 +221,109 @@ function useSorted(items: ProjectSummary[], sort: SortKey, desc: boolean, filter
 }
 
 function RecentView() {
-  const { items, refresh } = useLocalProjects(false);
-  const { openById } = useProjectActions();
+  const { items, refresh, loading } = useLocalProjects(false);
+  const { openById, pickPforge } = useProjectActions();
   const notify = useAppStore((s) => s.notify);
+  const setActiveFolderId = useAppStore((s) => s.setActiveFolderId);
+  const openModal = useAppStore((s) => s.openModal);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const folderId = searchParams.get("folder");
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [sort, setSort] = useState<SortKey>("recent");
   const [desc, setDesc] = useState(true);
   const [filter, setFilter] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const sorted = useSorted(items, sort, desc, filter);
+
+  const refreshFolders = useCallback(async () => setFolders(await listFolders().catch(() => [])), []);
+  useEffect(() => {
+    refreshFolders();
+  }, [refreshFolders]);
+  useEffect(() => {
+    setActiveFolderId(folderId);
+    return () => setActiveFolderId(null);
+  }, [folderId, setActiveFolderId]);
+
+  const folder = folders.find((f) => f.id === folderId) ?? null;
+  const goFolder = (id: string | null) => router.push(id ? `${STUDIO_PATH}?folder=${encodeURIComponent(id)}` : STUDIO_PATH);
+  const inFolder = items.filter((p) => (folderId ? p.folderId === folderId : !p.folderId));
+  const sorted = useSorted(inFolder, sort, desc, filter);
+  const countIn = (id: string) => items.filter((p) => p.folderId === id).length;
+
+  const move = async (projectId: string, target: string | null) => {
+    await moveProject(projectId, target);
+    const t = target ? folders.find((f) => f.id === target)?.name : "Gần đây";
+    notify(`Đã chuyển vào "${t}"`, "success");
+    refresh();
+  };
 
   return (
     <>
-      <ListHeader title="Gần đây" sort={sort} setSort={setSort} desc={desc} setDesc={setDesc} filter={filter} setFilter={setFilter} view={view} setView={setView} />
+      <ListHeader
+        title={<FolderBreadcrumb folder={folder} onRoot={() => goFolder(null)} />}
+        extra={
+          folderId ? (
+            <>
+              <button className="btn-primary sm" onClick={() => openModal("newSprite")}><FilePlus2 size={14} /> Sprite mới</button>
+              <button className="btn-ghost sm" onClick={() => openModal("pngToPixel")}><ImageDown size={14} /> PNG to Pixel</button>
+            </>
+          ) : (
+            <NewFolderButton onCreate={async (name) => { await createFolder(name); refreshFolders(); }} />
+          )
+        }
+        sort={sort} setSort={setSort} desc={desc} setDesc={setDesc} filter={filter} setFilter={setFilter} view={view} setView={setView}
+      />
+      {!folderId && folders.length > 0 && (
+        <div className="folder-grid">
+          {folders.map((f) => (
+            <FolderCard
+              key={f.id}
+              folder={f}
+              count={countIn(f.id)}
+              onOpen={() => goFolder(f.id)}
+              onRename={async (name) => { await renameFolder(f.id, name); refreshFolders(); }}
+              onDelete={async () => {
+                if (!confirm(`Xóa thư mục "${f.name}"? Các sprite bên trong sẽ được đưa về Gần đây.`)) return;
+                await deleteFolder(f.id);
+                refreshFolders();
+                refresh();
+              }}
+              onDropProject={(pid) => move(pid, f.id)}
+            />
+          ))}
+        </div>
+      )}
+      {folderId && <RootDropZone onDropProject={(pid) => move(pid, null)} />}
+      {folderId && !loading && inFolder.length === 0 ? (
+        <div className="empty-cta">
+          <FolderOpen size={36} className="muted" />
+          <strong>Thư mục "{folder?.name ?? ""}" đang trống</strong>
+          <span className="muted small">Tạo sprite mới ngay trong thư mục này, hoặc kéo sprite từ Gần đây vào.</span>
+          <div className="empty-cta-actions">
+            <button className="btn-primary" onClick={() => openModal("newSprite")}><FilePlus2 size={15} /> Tạo Sprite mới</button>
+            <button className="btn-ghost" onClick={() => openModal("pngToPixel")}><ImageDown size={15} /> PNG to Pixel</button>
+            <button className="btn-ghost" onClick={pickPforge}><FolderOpen size={15} /> Mở file .pforge</button>
+          </div>
+        </div>
+      ) : (
       <ProjectGrid
         items={sorted}
         view={view}
+        loading={loading}
+        draggable
         onOpen={(p) => openById(p.id)}
         actions={(p) => (
           <>
             <button className="btn-ghost sm" onClick={() => openById(p.id)}><FolderInput size={13} /> Mở</button>
+            <select
+              className="select sm"
+              title="Chuyển vào thư mục"
+              value={p.folderId ?? ""}
+              onChange={(e) => move(p.id, e.target.value || null)}
+            >
+              <option value="">— Gần đây —</option>
+              {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
             <button
               className="icon-btn sm danger"
               title="Chuyển vào thùng rác"
@@ -225,12 +338,13 @@ function RecentView() {
           </>
         )}
       />
+      )}
     </>
   );
 }
 
 function TrashView() {
-  const { items, refresh } = useLocalProjects(true);
+  const { items, refresh, loading } = useLocalProjects(true);
   const notify = useAppStore((s) => s.notify);
   const [sort, setSort] = useState<SortKey>("recent");
   const [desc, setDesc] = useState(true);
@@ -260,6 +374,7 @@ function TrashView() {
       <ProjectGrid
         items={sorted}
         view={view}
+        loading={loading}
         actions={(p) => (
           <>
             <button
@@ -351,7 +466,7 @@ function MarketplaceView() {
     <>
       <div className="home-head">
         <h1>Marketplace</h1>
-        <button className="icon-btn" onClick={refresh} title="Làm mới"><RefreshCw size={15} /></button>
+        <button className="icon-btn" onClick={refresh} title="Làm mới" disabled={loading}>{loading ? <Spinner size={15} /> : <RefreshCw size={15} />}</button>
       </div>
       <div className="home-filter">
         <span className="muted small">Sprite được cộng đồng chia sẻ. Mở để tạo bản sao vào máy của bạn.</span>
@@ -361,7 +476,7 @@ function MarketplaceView() {
       </div>
       {error && <div className="error-text">{error}</div>}
       {loading ? (
-        <div className="empty">Đang tải…</div>
+        <LoadingBlock label="Đang tải Marketplace…" />
       ) : filtered.length === 0 ? (
         <div className="empty">Chưa có sprite nào trên Marketplace.</div>
       ) : (
@@ -385,7 +500,7 @@ function MarketplaceView() {
                 )}
               </div>
               <div className="project-actions">
-                <button className="btn-ghost sm" disabled={busy === p._id} onClick={() => clone(p)}>Tải về & mở</button>
+                <button className="btn-ghost sm" disabled={busy === p._id} aria-busy={busy === p._id} onClick={() => clone(p)}>{busy === p._id ? <Spinner size={13} /> : <FolderInput size={13} />} Tải về & mở</button>
                 {user && p.ownerName === user.name && (
                   <button className="icon-btn sm danger" title="Gỡ khỏi Marketplace" disabled={busy === p._id} onClick={() => unpublish(p)}><X size={13} /></button>
                 )}

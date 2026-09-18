@@ -1,15 +1,18 @@
 import { create } from "zustand";
 
-export type Screen = "home" | "editor";
 export type HomeView = "recent" | "marketplace" | "trash";
 export type ModalKind = "newSprite" | "auth" | "export" | "pngToPixel" | "cloud" | "publish" | null;
 
 type AppState = {
-  screen: Screen;
   homeView: HomeView;
   modal: ModalKind;
   toast: { message: string; kind: "info" | "error" | "success" } | null;
-  setScreen: (s: Screen) => void;
+  /** label of a blocking global operation (opening a project, converting an image…) */
+  loading: string | null;
+  /** folder currently open on the home screen (null = root); new sprites are created inside it */
+  activeFolderId: string | null;
+  setActiveFolderId: (id: string | null) => void;
+  setLoading: (label: string | null) => void;
   setHomeView: (v: HomeView) => void;
   openModal: (m: ModalKind) => void;
   closeModal: () => void;
@@ -19,11 +22,13 @@ type AppState = {
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useAppStore = create<AppState>((set) => ({
-  screen: "home",
   homeView: "recent",
   modal: null,
   toast: null,
-  setScreen: (screen) => set({ screen }),
+  loading: null,
+  activeFolderId: null,
+  setActiveFolderId: (activeFolderId) => set({ activeFolderId }),
+  setLoading: (loading) => set({ loading }),
   setHomeView: (homeView) => set({ homeView }),
   openModal: (modal) => set({ modal }),
   closeModal: () => set({ modal: null }),

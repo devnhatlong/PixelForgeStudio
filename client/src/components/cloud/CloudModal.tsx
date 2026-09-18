@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Cloud, CloudUpload, FolderInput, RefreshCw, Trash2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { LoadingBlock, Spinner } from "@/components/ui/Loading";
 import { api, type CloudProject } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import { useEditorStore } from "@/store/editor-store";
@@ -114,18 +115,18 @@ export function CloudModal({ onClose }: { onClose: () => void }) {
             <strong>{doc.name}</strong>
             <div className="muted small">{doc.width}×{doc.height} · {doc.frames.length} frame · {doc.layers.length} layer</div>
           </div>
-          <button className="btn-primary" disabled={busy === "upload"} onClick={upload}>
-            {busy === "upload" ? "Đang tải lên…" : <><CloudUpload size={15} /> Lưu project hiện tại lên Cloud</>}
+          <button className="btn-primary" disabled={busy === "upload"} aria-busy={busy === "upload"} onClick={upload}>
+            {busy === "upload" ? <><Spinner size={15} /> Đang tải lên…</> : <><CloudUpload size={15} /> Lưu project hiện tại lên Cloud</>}
           </button>
         </div>
       )}
       <div className="panel-sub">
         <span>Project trên Cloud ({items.length})</span>
-        <button className="link-btn" onClick={refresh}><RefreshCw size={12} /> Làm mới</button>
+        <button className="link-btn" onClick={refresh} disabled={loading}>{loading ? <Spinner size={12} /> : <RefreshCw size={12} />} Làm mới</button>
       </div>
       {error && <div className="error-text">{error}</div>}
       {loading ? (
-        <div className="muted">Đang tải…</div>
+        <LoadingBlock label="Đang tải danh sách Cloud…" compact />
       ) : items.length === 0 ? (
         <div className="muted">Chưa có project nào trên Cloud.</div>
       ) : (
@@ -141,7 +142,7 @@ export function CloudModal({ onClose }: { onClose: () => void }) {
                   {p.published && <span className="chip warm" style={{ marginLeft: 6 }}>Marketplace</span>}
                 </div>
               </div>
-              <button className="btn-ghost" disabled={busy === p._id} onClick={() => open(p)}><FolderInput size={13} /> Mở</button>
+              <button className="btn-ghost" disabled={busy === p._id} aria-busy={busy === p._id} onClick={() => open(p)}>{busy === p._id ? <Spinner size={13} /> : <FolderInput size={13} />} Mở</button>
               <button className="icon-btn danger" disabled={busy === p._id} onClick={() => remove(p)}><Trash2 size={14} /></button>
             </div>
           ))}

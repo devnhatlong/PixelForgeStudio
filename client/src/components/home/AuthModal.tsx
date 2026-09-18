@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { User, Eye, EyeOff } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Loading";
 import { useAuthStore } from "@/store/auth-store";
 import { useAppStore } from "@/store/app-store";
 
@@ -12,7 +13,9 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [remember, setRemember] = useState(true);
+  const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const login = useAuthStore((s) => s.login);
@@ -25,6 +28,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError("Email không hợp lệ");
     if (password.length < 6) return setError("Mật khẩu phải có ít nhất 6 ký tự");
     if (mode === "register" && name.trim().length < 2) return setError("Tên hiển thị quá ngắn");
+    if (mode === "register" && password !== confirm) return setError("Mật khẩu nhập lại không khớp");
     setBusy(true);
     try {
       if (mode === "login") await login(email.trim(), password, remember);
@@ -65,12 +69,31 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
+        {mode === "register" && (
+          <>
+            <label className="field-label">Nhập lại mật khẩu</label>
+            <div className="input-icon-wrap">
+              <input
+                className={`text-input ${confirm && confirm !== password ? "invalid" : ""}`}
+                type={showConfirm ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+              <button type="button" className="input-icon-btn" onClick={() => setShowConfirm(!showConfirm)} title={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"} tabIndex={-1}>
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {confirm && confirm !== password && <div className="hint-text">Mật khẩu nhập lại chưa khớp</div>}
+          </>
+        )}
         <label className="check-row">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Bạn có muốn lưu thông tin đăng nhập?
         </label>
         {error && <div className="error-text">{error}</div>}
-        <button className="btn-primary big" type="submit" disabled={busy}>
-          {busy ? "Đang xử lý…" : mode === "login" ? "Đăng Nhập" : "Tạo Tài Khoản"}
+        <button className="btn-primary big" type="submit" disabled={busy} aria-busy={busy}>
+          {busy ? <><Spinner size={16} /> Đang xử lý…</> : mode === "login" ? "Đăng Nhập" : "Tạo Tài Khoản"}
         </button>
       </form>
     </Modal>

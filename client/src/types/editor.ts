@@ -65,8 +65,17 @@ export interface FloatingBuffer {
   offsetY: number;
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ProjectSummary {
   id: string;
+  /** folder id, undefined/null = root */
+  folderId?: string | null;
   name: string;
   width: number;
   height: number;

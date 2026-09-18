@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Home, Undo2, Redo2, Grid3x3, Save, Layers, Film, Plus, Cloud, Store, Download, User, LogOut, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Home, Undo2, Redo2, Grid3x3, Save, Layers, Film, Plus, Cloud, Store, Download, User, LogOut, ZoomIn, ZoomOut } from "lucide-react";
 import { PixelCanvas } from "./PixelCanvas";
 import { Toolbar, useEditorShortcuts } from "./Toolbar";
 import { ColorPanel } from "./ColorPanel";
@@ -12,6 +12,7 @@ import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
 import { saveProject } from "@/lib/storage";
 import { downloadPforge } from "@/lib/pforge";
+import { useProjectActions } from "@/hooks/useProjectActions";
 
 export function EditorShell() {
   const doc = useEditorStore((s) => s.doc);
@@ -29,12 +30,12 @@ export function EditorShell() {
   const tool = useEditorStore((s) => s.tool);
   const closeDocument = useEditorStore((s) => s.closeDocument);
 
-  const setScreen = useAppStore((s) => s.setScreen);
   const openModal = useAppStore((s) => s.openModal);
   const notify = useAppStore((s) => s.notify);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
+  const { goHome: navigateHome } = useProjectActions();
   const [showLayers, setShowLayers] = useState(true);
   const [showTimeline, setShowTimeline] = useState(true);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -83,15 +84,17 @@ export function EditorShell() {
       await saveProject(doc).catch(() => {});
       markSaved();
     }
+    const id = doc.id;
     closeDocument();
-    setScreen("home");
+    navigateHome(id);
   };
 
   return (
     <div className="editor">
       <header className="editor-topbar">
-        <button className="brand-btn" onClick={goHome} title="Về trang chủ"><Home size={16} /></button>
+        <span className="brand-btn" aria-hidden><Home size={16} /></span>
         <span className="brand">PixAsset Create</span>
+        <button className="btn-ghost back-btn" onClick={goHome} title="Quay lại Studio (tự động lưu)"><ArrowLeft size={16} /> Studio</button>
         <div className="doc-title">
           {editingName ? (
             <input
