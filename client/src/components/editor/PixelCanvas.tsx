@@ -45,6 +45,9 @@ export function PixelCanvas() {
   const layerId = useEditorStore((s) => s.layerId);
   const zoom = useEditorStore((s) => s.zoom);
   const showGrid = useEditorStore((s) => s.showGrid);
+  const gridSize = useEditorStore((s) => s.gridSize);
+  const gridAuto = useEditorStore((s) => s.gridAuto);
+  const gridOpacity = useEditorStore((s) => s.gridOpacity);
   const onionSkin = useEditorStore((s) => s.onionSkin);
   const tool = useEditorStore((s) => s.tool);
   const primary = useEditorStore((s) => s.primary);
@@ -145,9 +148,9 @@ export function PixelCanvas() {
       ctx.setLineDash([]);
     }
 
-    // grid
+    // pixel grid
     if (showGrid && zoom >= 6) {
-      ctx.strokeStyle = "rgba(255,255,255,0.09)";
+      ctx.strokeStyle = `rgba(255,255,255,${0.15 * gridOpacity})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = 0; x <= width; x++) {
@@ -159,6 +162,24 @@ export function PixelCanvas() {
         ctx.lineTo(canvas.width, y * zoom + 0.5);
       }
       ctx.stroke();
+    }
+
+    // major grid overlay (drawing guide only, never part of the pixel data)
+    const major = gridAuto ? autoGridSize(width, height) : gridSize;
+    if (major >= 2) {
+      ctx.strokeStyle = `rgba(47,211,207,${0.75 * gridOpacity})`;
+      ctx.lineWidth = zoom >= 12 ? 1.5 : 1;
+      ctx.beginPath();
+      for (let x = major; x < width; x += major) {
+        ctx.moveTo(x * zoom + 0.5, 0);
+        ctx.lineTo(x * zoom + 0.5, canvas.height);
+      }
+      for (let y = major; y < height; y += major) {
+        ctx.moveTo(0, y * zoom + 0.5);
+        ctx.lineTo(canvas.width, y * zoom + 0.5);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 1;
     }
 
     // selection outline (marching ants style)
@@ -221,7 +242,7 @@ export function PixelCanvas() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [doc, frameIndex, zoom, showGrid, onionSkin, tool, primary, brushSize, mirror, selection, floating, drag, hover, playing, layerId]);
+  }, [doc, frameIndex, zoom, showGrid, gridSize, gridAuto, gridOpacity, onionSkin, tool, primary, brushSize, mirror, selection, floating, drag, hover, playing, layerId]);
 
   const toPixel = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>): Point => {
@@ -394,6 +415,11 @@ export function PixelCanvas() {
       onWheel={onWheel}
     />
   );
+}
+
+/** 32→4, 64→8, 128→16 … (one cell = 1/8 of the larger side, min 2) */
+export function autoGridSize(w: number, h: number): number {
+  return Math.max(2, Math.round(Math.max(w, h) / 8));
 }
 
 function shapePoints(tool: string, a: Point, b: Point, brush: number, mirror: "off" | "horizontal" | "vertical" | "both", w: number, h: number): Point[] {

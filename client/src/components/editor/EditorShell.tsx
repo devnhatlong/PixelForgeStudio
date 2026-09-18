@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Home, Undo2, Redo2, Grid3x3, Save, Layers, Film, Plus, Cloud, Store, Download, User, LogOut, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Home, Undo2, Redo2, Save, Layers, Film, Plus, Cloud, Store, Download, User, LogOut, ZoomIn, ZoomOut } from "lucide-react";
 import { PixelCanvas } from "./PixelCanvas";
 import { Toolbar, useEditorShortcuts } from "./Toolbar";
 import { ColorPanel } from "./ColorPanel";
 import { LayersPanel } from "./LayersPanel";
 import { Timeline } from "./Timeline";
+import { GridMenu } from "./GridMenu";
 import { useEditorStore } from "@/store/editor-store";
 import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
@@ -23,8 +24,6 @@ export function EditorShell() {
   const redo = useEditorStore((s) => s.redo);
   const canUndo = useEditorStore((s) => s.history.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
-  const showGrid = useEditorStore((s) => s.showGrid);
-  const toggleGrid = useEditorStore((s) => s.toggleGrid);
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
   const tool = useEditorStore((s) => s.tool);
@@ -115,7 +114,7 @@ export function EditorShell() {
           <button className="icon-btn" disabled={!canUndo} onClick={undo} title="Hoàn tác (Ctrl+Z)"><Undo2 size={16} /></button>
           <button className="icon-btn" disabled={!canRedo} onClick={redo} title="Làm lại (Ctrl+Y)"><Redo2 size={16} /></button>
           <span className="divider" />
-          <button className={`icon-btn ${showGrid ? "on" : ""}`} onClick={toggleGrid} title="Lưới pixel"><Grid3x3 size={16} /></button>
+          <GridMenu />
           <button className="icon-btn" onClick={() => downloadPforge(doc)} title="Lưu file .pforge (Ctrl+S)"><Save size={16} /></button>
           <span className="divider" />
           <button className={`btn-ghost ${showLayers ? "on" : ""}`} onClick={() => setShowLayers(!showLayers)}><Layers size={15} /> Layer</button>

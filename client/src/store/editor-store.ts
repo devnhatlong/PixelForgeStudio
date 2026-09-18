@@ -19,6 +19,12 @@ type EditorState = {
   mirror: MirrorMode;
   zoom: number;
   showGrid: boolean;
+  /** major grid cell size in pixels; 0 = off. Ignored when gridAuto is on. */
+  gridSize: number;
+  /** derive major grid size from canvas size (max(w,h)/8) */
+  gridAuto: boolean;
+  /** 0..1 opacity of the grid overlay */
+  gridOpacity: number;
   onionSkin: boolean;
   playing: boolean;
   fps: number;
@@ -43,6 +49,9 @@ type EditorState = {
   setMirror: (m: MirrorMode) => void;
   setZoom: (z: number) => void;
   toggleGrid: () => void;
+  setGridSize: (n: number) => void;
+  setGridAuto: (b: boolean) => void;
+  setGridOpacity: (n: number) => void;
   toggleOnionSkin: () => void;
   setPlaying: (p: boolean) => void;
   setFps: (fps: number) => void;
@@ -111,6 +120,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mirror: "off",
   zoom: 16,
   showGrid: true,
+  gridSize: 0,
+  gridAuto: false,
+  gridOpacity: 0.6,
   onionSkin: false,
   playing: false,
   fps: 8,
@@ -155,6 +167,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMirror: (m) => set({ mirror: m }),
   setZoom: (z) => set({ zoom: Math.max(1, Math.min(64, z)) }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  setGridSize: (n) => set({ gridSize: Math.max(0, Math.min(64, Math.round(n))), gridAuto: false }),
+  setGridAuto: (b) => set({ gridAuto: b }),
+  setGridOpacity: (n) => set({ gridOpacity: Math.max(0.1, Math.min(1, n)) }),
   toggleOnionSkin: () => set((s) => ({ onionSkin: !s.onionSkin })),
   setPlaying: (p) => set({ playing: p }),
   setFps: (fps) => set({ fps: Math.max(1, Math.min(60, fps)) }),
