@@ -1,0 +1,24 @@
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +15ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMongooseModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMongooseCoreModule dependencies initialized[39m[38;5;3m +10ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMongooseModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMongooseModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProjectsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/api/v1/auth}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/register, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/login, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectsController {/api/v1/projects}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id/publish, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mMarketplaceController {/api/v1/marketplace}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/marketplace, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/marketplace/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 1288  - [39m09/18/2026, 5:38:21 PM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +1ms[39m
+PixelForge API listening on http://localhost:4000/api/v1
