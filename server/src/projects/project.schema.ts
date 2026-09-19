@@ -35,6 +35,20 @@ export class Project {
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   data: Record<string, unknown>;
 
+  /** the PixelDocument's own updatedAt (client clock) — used for last-write-wins merging */
+  @Prop({ type: Number, default: 0, index: true })
+  docUpdatedAt: number;
+
+  /** client folder id (null = root) */
+  @Prop({ type: String, default: null, index: true })
+  folderId: string | null;
+
+  @Prop({ default: false, index: true })
+  deleted: boolean;
+
+  @Prop({ type: Number, default: null })
+  deletedAt: number | null;
+
   @Prop({ default: false, index: true })
   published: boolean;
 

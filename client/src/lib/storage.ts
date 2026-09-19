@@ -53,9 +53,11 @@ export async function saveProject(doc: PixelDocument, extra?: Partial<ProjectSum
     height: doc.height,
     frameCount: doc.frames.length,
     thumbnail: makeThumbnail(doc),
-    updatedAt: Date.now(),
+    // the document's own edit time, so local/cloud comparisons are consistent across devices
+    updatedAt: doc.updatedAt || Date.now(),
     deleted: extra?.deleted ?? existing?.deleted ?? false,
     folderId: extra?.folderId !== undefined ? extra.folderId : existing?.folderId ?? null,
+    cloudOnly: false,
   };
   await tx(STORE_DOCS, "readwrite", (s) => s.put({ id: doc.id, doc } satisfies StoredDoc));
   await tx(STORE_PROJECTS, "readwrite", (s) => s.put(summary));
@@ -87,6 +89,20 @@ export async function setDeleted(id: string, deleted: boolean): Promise<void> {
 export async function deleteForever(id: string): Promise<void> {
   await tx(STORE_PROJECTS, "readwrite", (s) => s.delete(id));
   await tx(STORE_DOCS, "readwrite", (s) => s.delete(id));
+}
+
+/** low-level: write a summary as-is (used by the sync engine) */
+export async function putSummaryRaw(summary: ProjectSummary): Promise<void> {
+  await tx(STORE_PROJECTS, "readwrite", (s) => s.put(summary));
+}
+
+/** low-level: write a folder as-is (used by the sync engine) */
+export async function putFolderRaw(folder: Folder): Promise<void> {
+  await tx(STORE_FOLDERS, "readwrite", (s) => s.put(folder));
+}
+
+export async function deleteFolderLocalOnly(id: string): Promise<void> {
+  await tx(STORE_FOLDERS, "readwrite", (s) => s.delete(id));
 }
 
 export async function updateSummary(id: string, patch: Partial<ProjectSummary>): Promise<void> {

@@ -4,7 +4,8 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useEditorStore } from "@/store/editor-store";
 import { useAppStore } from "@/store/app-store";
-import { getSummary, loadDocument, saveProject } from "@/lib/storage";
+import { getSummary, saveProject } from "@/lib/storage";
+import { ensureLocalDocument, pushDocument } from "@/lib/sync";
 import { parsePforge } from "@/lib/pforge";
 import type { PixelDocument } from "@/types/editor";
 
@@ -28,6 +29,7 @@ export function useProjectActions() {
         closeModal();
         const existing = await getSummary(doc.id);
         await saveProject(doc, existing ? undefined : { folderId: activeFolderId });
+        pushDocument(doc);
         router.push(projectPath(doc.id));
       } catch {
         notify("Không lưu được vào bộ nhớ trình duyệt", "error");
@@ -43,7 +45,7 @@ export function useProjectActions() {
     async (id: string) => {
       setLoading("Đang mở project…");
       try {
-        const doc = await loadDocument(id);
+        const doc = await ensureLocalDocument(id);
         if (!doc) return notify("Không tìm thấy dữ liệu project", "error");
         load(doc);
         router.push(projectPath(id));

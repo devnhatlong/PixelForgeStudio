@@ -14,6 +14,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { saveProject } from "@/lib/storage";
 import { downloadPforge } from "@/lib/pforge";
 import { useProjectActions } from "@/hooks/useProjectActions";
+import { flush, pushDocument } from "@/lib/sync";
+import { SyncBadge } from "@/components/ui/SyncBadge";
 
 export function EditorShell() {
   const doc = useEditorStore((s) => s.doc);
@@ -50,6 +52,7 @@ export function EditorShell() {
         await saveProject(doc);
         markSaved();
         setSavedAt(Date.now());
+        pushDocument(doc);
       } catch {
         /* ignore */
       }
@@ -82,10 +85,12 @@ export function EditorShell() {
     if (dirty) {
       await saveProject(doc).catch(() => {});
       markSaved();
+      pushDocument(doc);
     }
     const id = doc.id;
     closeDocument();
     navigateHome(id);
+    flush();
   };
 
   return (
@@ -109,6 +114,7 @@ export function EditorShell() {
           <span className="chip">{doc.width}x{doc.height}</span>
           <span className={`save-dot ${dirty ? "dirty" : ""}`} title={dirty ? "Đang chờ lưu…" : savedAt ? `Đã lưu ${new Date(savedAt).toLocaleTimeString("vi-VN")}` : "Đã lưu"} />
         </div>
+        <SyncBadge compact />
 
         <div className="topbar-center">
           <button className="icon-btn" disabled={!canUndo} onClick={undo} title="Hoàn tác (Ctrl+Z)"><Undo2 size={16} /></button>

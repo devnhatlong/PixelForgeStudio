@@ -43,6 +43,11 @@ API tại `http://localhost:4000/api/v1`.
 | GET | `/projects/:id` | Tải project đầy đủ |
 | DELETE | `/projects/:id` | Xóa khỏi Cloud |
 | PATCH | `/projects/:id/publish` | Đăng / gỡ Marketplace `{published, description, tags}` |
+| PATCH | `/projects/meta` | Đổi thư mục / thùng rác / tên (không gửi pixel) |
+| GET | `/projects/by-client/:clientId` | Tải project theo id phía client |
+| DELETE | `/projects/by-client/:clientId` | Xóa vĩnh viễn theo id phía client |
+| GET/POST | `/folders` | Danh sách / tạo-đổi tên thư mục (upsert theo `clientId`) |
+| DELETE | `/folders/:clientId` | Xóa thư mục (project bên trong về gốc) |
 | GET | `/marketplace` | Danh sách sprite công khai |
 | GET | `/marketplace/:id` | Tải sprite công khai (tăng lượt tải) |
 
@@ -62,6 +67,8 @@ API tại `http://localhost:4000/api/v1`.
 - Zoom: Ctrl + cuộn chuột, `+` `-`.
 
 **Xuất file**: PNG tĩnh (chọn frame, 1–32x, nền trong suốt/đen/trắng), ZIP từng frame + `animation_meta.json`, GIF động (timing theo từng frame, nền trong suốt), Sprite Sheet PNG + JSON (lưới/dải ngang/dải dọc, số cột, khoảng cách, tỉ lệ; JSON kiểu Aseprite/TexturePacker hash dùng được với Unity, Godot, Phaser).
+
+**Đồng bộ Cloud** (`client/src/lib/sync.ts`): khi đã đăng nhập, MongoDB là nguồn dữ liệu chính, IndexedDB chỉ là cache. Mỗi lần auto-save sẽ đẩy lên server (debounce 1.5s, last-write-wins theo `updatedAt` của document); thư mục, thùng rác, đổi tên cũng được phản chiếu. Khi mở app / đăng nhập, client kéo danh sách project + thư mục về, tải pixel theo nhu cầu và tự đẩy lại các project local mới hơn Cloud. Lần đăng nhập đầu sẽ hỏi đồng bộ các project chỉ có trên máy. Chưa đăng nhập → làm việc hoàn toàn cục bộ.
 
 **Cloud & Marketplace** (cần đăng nhập): lưu/mở/xóa project trên server, đăng sprite lên Marketplace kèm mô tả + tags, người khác tải về và mở thành bản sao.
 

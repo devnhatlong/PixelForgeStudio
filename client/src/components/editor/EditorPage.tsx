@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useEditorStore } from "@/store/editor-store";
-import { loadDocument, saveProject } from "@/lib/storage";
+import { useAuthStore } from "@/store/auth-store";
+import { saveProject } from "@/lib/storage";
+import { ensureLocalDocument, pushDocument } from "@/lib/sync";
 import { STUDIO_PATH } from "@/hooks/useProjectActions";
 import { LoadingBlock } from "@/components/ui/Loading";
 import { EditorShell } from "./EditorShell";
@@ -13,6 +15,7 @@ export function EditorPage({ id }: { id: string }) {
   const doc = useEditorStore((s) => s.doc);
   const dirty = useEditorStore((s) => s.dirty);
   const load = useEditorStore((s) => s.loadDocument);
+  const authReady = useAuthStore((s) => s.ready);
   const [status, setStatus] = useState<"loading" | "ready" | "missing">(doc?.id === id ? "ready" : "loading");
 
   useEffect(() => {
@@ -20,12 +23,16 @@ export function EditorPage({ id }: { id: string }) {
       setStatus("ready");
       return;
     }
+    if (!authReady) return; // wait for session restore so cloud-only projects can be fetched
     let cancelled = false;
     (async () => {
       // leaving another project: persist it before switching
       const current = useEditorStore.getState();
-      if (current.doc && current.dirty) await saveProject(current.doc).catch(() => {});
-      const next = await loadDocument(id).catch(() => undefined);
+      if (current.doc && current.dirty) {
+        await saveProject(current.doc).catch(() => {});
+        pushDocument(current.doc);
+      }
+      const next = await ensureLocalDocument(id).catch(() => undefined);
       if (cancelled) return;
       if (!next) return setStatus("missing");
       load(next);
@@ -35,7 +42,7 @@ export function EditorPage({ id }: { id: string }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, authReady]);
 
   // keep the browser tab title in sync
   useEffect(() => {

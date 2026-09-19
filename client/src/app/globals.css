@@ -383,3 +383,11 @@ button[aria-busy="true"] { pointer-events: none; opacity: .75; }
 .brush-custom { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .brush-custom input[type="range"] { flex: 1; min-width: 0; }
 .brush-custom .num-input { width: 56px; }
+
+/* ---------- sync badge ---------- */
+.sync-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border-2); background: var(--bg-3); color: var(--muted); white-space: nowrap; }
+.sync-badge.synced { color: var(--green); border-color: #14532d; }
+.sync-badge.pending { color: var(--orange); border-color: #7c2d12; cursor: pointer; }
+.sync-badge.syncing { color: var(--accent-2); }
+.sync-badge.error { color: var(--red); border-color: #7f1d1d; cursor: pointer; }
+.sync-badge.idle { color: var(--accent-2); }

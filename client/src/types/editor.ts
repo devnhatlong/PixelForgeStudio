@@ -85,4 +85,6 @@ export interface ProjectSummary {
   deleted?: boolean;
   deletedAt?: number;
   cloudId?: string;
+  /** summary came from the cloud; pixel data not yet downloaded */
+  cloudOnly?: boolean;
 }

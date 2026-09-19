@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
-import { ProjectsService, UpsertProjectDto } from "./projects.service";
+import { ProjectMetaDto, ProjectsService, ProjectSummaryRecord, UpsertProjectDto } from "./projects.service";
 import { AuthGuard, CurrentUser, JwtPayload } from "../auth/auth.guard";
 
 @Controller("projects")
@@ -13,8 +13,24 @@ export class ProjectsController {
   }
 
   @Post()
-  upsert(@CurrentUser() user: JwtPayload, @Body() body: UpsertProjectDto) {
+  upsert(@CurrentUser() user: JwtPayload, @Body() body: UpsertProjectDto): Promise<ProjectSummaryRecord> {
     return this.projects.upsert(user.sub, user.name, body);
+  }
+
+  /** folder / trash / rename without pixel data */
+  @Patch("meta")
+  meta(@CurrentUser() user: JwtPayload, @Body() body: ProjectMetaDto) {
+    return this.projects.updateMeta(user.sub, body);
+  }
+
+  @Get("by-client/:clientId")
+  getByClient(@CurrentUser() user: JwtPayload, @Param("clientId") clientId: string) {
+    return this.projects.getByClientId(user.sub, clientId);
+  }
+
+  @Delete("by-client/:clientId")
+  removeByClient(@CurrentUser() user: JwtPayload, @Param("clientId") clientId: string) {
+    return this.projects.removeByClientId(user.sub, clientId);
   }
 
   @Get(":id")

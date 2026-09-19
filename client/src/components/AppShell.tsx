@@ -12,6 +12,8 @@ import { ExportModal } from "./editor/ExportModal";
 import { CloudModal } from "./cloud/CloudModal";
 import { PublishModal } from "./cloud/PublishModal";
 import { LoadingOverlay } from "./ui/Loading";
+import { flush, listUnsynced, pullAll, uploadAllLocal } from "@/lib/sync";
+import { useSyncStore } from "@/store/sync-store";
 
 /** Global chrome shared by every route: modals, toast, loading overlay, session restore, .pforge drag & drop. */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -20,6 +22,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const toast = useAppStore((s) => s.toast);
   const loading = useAppStore((s) => s.loading);
   const restore = useAuthStore((s) => s.restore);
+  const user = useAuthStore((s) => s.user);
+  const notify = useAppStore((s) => s.notify);
+  const setSync = useSyncStore((s) => s.set);
   const dirty = useEditorStore((s) => s.dirty);
   const { openDocument, openPforgeFile } = useProjectActions();
 
@@ -27,8 +32,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     restore();
   }, [restore]);
 
+  // on login: offer to upload local-only projects, then pull the cloud state
+  useEffect(() => {
+    if (!user) {
+      setSync({ status: "offline", pending: 0, lastError: null });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const unsynced = await listUnsynced().catch(() => []);
+      if (cancelled) return;
+      if (unsynced.length > 0 && confirm(`Bạn có ${unsynced.length} project chỉ lưu trên trình duyệt này. Đồng bộ chúng lên tài khoản ${user.email}?`)) {
+        const n = await uploadAllLocal().catch(() => 0);
+        notify(`Đã đồng bộ ${n} project lên Cloud`, "success");
+      }
+      await pullAll();
+      window.dispatchEvent(new Event("pf:pulled"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, notify, setSync]);
+
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
+      flush();
       if (dirty) e.preventDefault();
     };
     window.addEventListener("beforeunload", h);

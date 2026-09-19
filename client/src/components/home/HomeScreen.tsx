@@ -11,6 +11,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createFolder, deleteFolder, deleteForever, listFolders, listProjects, moveProject, renameFolder, setDeleted } from "@/lib/storage";
 import { FolderBreadcrumb, FolderCard, NewFolderButton, RootDropZone } from "./FolderBar";
 import { STUDIO_PATH } from "@/hooks/useProjectActions";
+import { deleteRemote, deleteRemoteFolder, pullAll, pushFolder, pushMeta } from "@/lib/sync";
+import { SyncBadge } from "@/components/ui/SyncBadge";
 import { api, type CloudProject } from "@/lib/api";
 import { normalizeDocument, uid } from "@/lib/document";
 import { useProjectActions } from "@/hooks/useProjectActions";
@@ -54,6 +56,7 @@ export function HomeScreen() {
         <div className="user-card">
           <div className="avatar">{!authReady ? <Spinner size={14} /> : user ? user.name.slice(0, 1).toUpperCase() : <User size={16} />}</div>
           <div className="user-name">{!authReady ? "Đang kiểm tra phiên…" : user ? user.name : "Chưa đăng nhập"}</div>
+          <SyncBadge />
           {!authReady ? (
             <button className="btn-ghost full" disabled aria-busy="true"><Spinner size={14} /> Đang tải</button>
           ) : user ? (
@@ -89,6 +92,7 @@ export function HomeScreen() {
 function useLocalProjects(deleted: boolean) {
   const [items, setItems] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
   const refresh = useCallback(async () => {
     try {
       const all = await listProjects();
@@ -101,7 +105,12 @@ function useLocalProjects(deleted: boolean) {
   }, [deleted]);
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    // when logged in, also merge the cloud state (AppShell does this on login; this covers navigation back)
+    if (user) pullAll().then((changed) => { if (changed) window.dispatchEvent(new Event("pf:pulled")); });
+    const onPulled = () => refresh();
+    window.addEventListener("pf:pulled", onPulled);
+    return () => window.removeEventListener("pf:pulled", onPulled);
+  }, [refresh, user]);
   return { items, refresh, loading };
 }
 
@@ -238,6 +247,8 @@ function RecentView() {
   const refreshFolders = useCallback(async () => setFolders(await listFolders().catch(() => [])), []);
   useEffect(() => {
     refreshFolders();
+    window.addEventListener("pf:pulled", refreshFolders);
+    return () => window.removeEventListener("pf:pulled", refreshFolders);
   }, [refreshFolders]);
   useEffect(() => {
     setActiveFolderId(folderId);
@@ -252,6 +263,7 @@ function RecentView() {
 
   const move = async (projectId: string, target: string | null) => {
     await moveProject(projectId, target);
+    pushMeta(projectId, { folderId: target });
     const t = target ? folders.find((f) => f.id === target)?.name : "Gần đây";
     notify(`Đã chuyển vào "${t}"`, "success");
     refresh();
@@ -268,7 +280,7 @@ function RecentView() {
               <button className="btn-ghost sm" onClick={() => openModal("pngToPixel")}><ImageDown size={14} /> PNG to Pixel</button>
             </>
           ) : (
-            <NewFolderButton onCreate={async (name) => { await createFolder(name); refreshFolders(); }} />
+            <NewFolderButton onCreate={async (name) => { const f = await createFolder(name); pushFolder(f); refreshFolders(); }} />
           )
         }
         sort={sort} setSort={setSort} desc={desc} setDesc={setDesc} filter={filter} setFilter={setFilter} view={view} setView={setView}
@@ -281,10 +293,11 @@ function RecentView() {
               folder={f}
               count={countIn(f.id)}
               onOpen={() => goFolder(f.id)}
-              onRename={async (name) => { await renameFolder(f.id, name); refreshFolders(); }}
+              onRename={async (name) => { await renameFolder(f.id, name); pushFolder({ ...f, name, updatedAt: Date.now() }); refreshFolders(); }}
               onDelete={async () => {
                 if (!confirm(`Xóa thư mục "${f.name}"? Các sprite bên trong sẽ được đưa về Gần đây.`)) return;
                 await deleteFolder(f.id);
+                deleteRemoteFolder(f.id);
                 refreshFolders();
                 refresh();
               }}
@@ -329,6 +342,7 @@ function RecentView() {
               title="Chuyển vào thùng rác"
               onClick={async () => {
                 await setDeleted(p.id, true);
+                pushMeta(p.id, { deleted: true, deletedAt: Date.now() });
                 notify(`Đã chuyển "${p.name}" vào Recycle Bin`);
                 refresh();
               }}
@@ -363,7 +377,10 @@ function TrashView() {
             className="btn-ghost sm danger"
             onClick={async () => {
               if (!confirm("Xóa vĩnh viễn toàn bộ thùng rác?")) return;
-              for (const p of items) await deleteForever(p.id);
+              for (const p of items) {
+                await deleteForever(p.id);
+                await deleteRemote(p.id);
+              }
               refresh();
             }}
           >
@@ -381,6 +398,7 @@ function TrashView() {
               className="btn-ghost sm"
               onClick={async () => {
                 await setDeleted(p.id, false);
+                pushMeta(p.id, { deleted: false, deletedAt: null });
                 notify(`Đã khôi phục "${p.name}"`, "success");
                 refresh();
               }}
@@ -393,6 +411,7 @@ function TrashView() {
               onClick={async () => {
                 if (!confirm(`Xóa vĩnh viễn "${p.name}"?`)) return;
                 await deleteForever(p.id);
+                await deleteRemote(p.id);
                 refresh();
               }}
             >
