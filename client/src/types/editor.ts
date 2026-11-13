@@ -1,4 +1,4 @@
-import type { SpriteMeta, SpriteSummary } from "./sprite";
+import type { AnimationTag, SpriteMeta, SpriteSummary } from "./sprite";
 
 export type EditorTool =
   | "pencil"
@@ -40,6 +40,10 @@ export interface Frame {
 export interface PixelDocument {
   /** optional sprite-pipeline metadata (master/variant); absent on ordinary projects */
   sprite?: SpriteMeta;
+  /** named animation states (frame ranges); exported as Unity clips */
+  animations?: AnimationTag[];
+  /** pivot / feet position used by alignment tools when the doc has no sprite meta */
+  anchor?: { x: number; y: number };
   id: string;
   name: string;
   width: number;

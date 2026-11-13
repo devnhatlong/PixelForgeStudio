@@ -6,7 +6,7 @@ import { shade } from "@/lib/color";
 
 export type PaintMode = "color" | "erase" | "lighten" | "darken" | "dither";
 
-const HISTORY_LIMIT = 80;
+export const HISTORY_LIMIT = 80;
 
 type EditorState = {
   doc: PixelDocument | null;

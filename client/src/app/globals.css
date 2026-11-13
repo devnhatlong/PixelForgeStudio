@@ -679,3 +679,136 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .slicer-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .slicer-actions .btn-ghost, .slicer-actions .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 @media (max-width: 1100px) { .slicer { grid-template-columns: 1fr; } }
+
+/* ---------- Character DNA ---------- */
+.dna-card, .dna-editor { margin: 12px 0; padding: 12px; border-radius: 12px; background: var(--bg-3); border: 1px solid var(--border-2); display: flex; flex-direction: column; gap: 7px; }
+.dna-card.match { border-color: #166534; }
+.dna-card.check { border-color: #7c5a12; }
+.dna-card.drift { border-color: #7f1d1d; }
+.dna-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dna-head svg { color: var(--accent-2); }
+.dna-score { margin-left: auto; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.dna-score.match { color: #86efac; background: #07210f; }
+.dna-score.check { color: #fbbf24; background: #241a06; }
+.dna-score.drift { color: #fca5a5; background: #220909; }
+.dna-row { display: grid; grid-template-columns: 150px 1fr 64px; gap: 8px; align-items: center; font-size: 12px; }
+.dna-label { color: var(--text-2); }
+.dna-bar { height: 6px; border-radius: 6px; background: var(--bg); overflow: hidden; }
+.dna-bar span { display: block; height: 100%; border-radius: 6px; }
+.dna-bar .ok { background: var(--green); }
+.dna-bar .warn { background: var(--orange); }
+.dna-bar .bad { background: var(--red); }
+.dna-val { text-align: right; font-variant-numeric: tabular-nums; }
+.dna-val.ok { color: #86efac; }
+.dna-val.warn { color: #fbbf24; }
+.dna-val.bad { color: #fca5a5; }
+.dna-editor textarea.text-input { height: auto; padding: 8px 10px; font-size: 12px; line-height: 1.45; resize: vertical; }
+.dna-editor .text-input { font-size: 12px; }
+.dna-facts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.dna-editor .row-actions { margin-top: 2px; }
+.dna-editor .btn-ghost.sm, .dna-editor .btn-primary.sm { display: inline-flex; align-items: center; gap: 5px; }
+.note.dna-note { border-color: #1e4f55; background: #0f1a1f; color: #bff4ef; flex-wrap: nowrap; }
+.note.dna-note svg { flex: none; margin-top: 2px; }
+
+/* ---------- animation studio ---------- */
+.timeline-bar { flex-wrap: wrap; row-gap: 6px; }
+.timeline-bar .btn-ghost.sm { display: inline-flex; align-items: center; gap: 5px; }
+.ghost-ctl { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.ghost-ctl .seg button { padding: 4px 8px; }
+.tag-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 12px; border-top: 1px solid var(--border); }
+.tag-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; background: var(--bg-3); border: 1px solid var(--border-2); color: var(--text-2); }
+.tag-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tag, var(--muted)); }
+.tag-chip:hover { color: var(--text); border-color: var(--tag, var(--accent)); }
+.tag-chip.active { color: var(--text); border-color: var(--tag, var(--accent)); background: color-mix(in srgb, var(--tag, #0fa9ab) 18%, var(--bg-3)); }
+.tag-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--accent); }
+.tag-form .ui-select { width: 130px; }
+.tag-form .num-input { width: 52px; }
+.tag-form .num-input.name { width: 110px; }
+.check-row.inline { margin-top: 0; }
+.frame-card { position: relative; }
+.frame-card.dim { opacity: .35; }
+.frame-tags { position: absolute; left: 4px; right: 4px; bottom: 3px; display: flex; gap: 2px; }
+.frame-tags span { flex: 1; height: 3px; border-radius: 2px; }
+.game-canvas { display: block; width: 100%; max-width: 768px; aspect-ratio: 2 / 1; image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--border-2); margin: 0 auto; }
+.game-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 6px; }
+.danger-text { color: #fca5a5; }
+
+/* ---------- version history ---------- */
+.version-list { list-style: none; margin: 0; padding: 8px 10px 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.version-list li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.version-list .link-btn { display: inline-flex; align-items: center; gap: 3px; }
+.project-actions .chip-btn { height: 26px; }
+
+/* ---------- Sprite Forge layout polish (overrides above) ---------- */
+.forge-head { flex-wrap: nowrap; min-width: 0; }
+.forge-head > .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.forge-head h1, .forge-head .btn-ghost, .provider-pill, .assistant-toggle { white-space: nowrap; flex: none; }
+
+.forge-body { grid-template-columns: minmax(360px, 400px) minmax(380px, 1fr) minmax(420px, 1.2fr); }
+.forge-col { padding: 0 20px 48px; }
+/* column titles stay visible while scrolling and line up across the three columns */
+.forge-col > h3 {
+  position: sticky; top: 0; z-index: 6; margin: 0 -20px 12px; padding: 14px 20px 10px;
+  background: linear-gradient(var(--bg) 80%, rgba(11,11,14,0)); min-height: 46px;
+}
+.h3-actions { flex-wrap: nowrap; white-space: nowrap; }
+
+/* labels never wrap: one line, ellipsis, full text in the tooltip */
+.forge .field-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 16px; }
+.label-opt { white-space: nowrap; }
+/* fields in the same row share the same baseline even if labels differ */
+.forge .grid2, .forge .grid3, .gen-options { align-items: end; }
+.forge .grid2 > div, .gen-options > div { min-width: 0; }
+.forge .grid2 input[type="range"] { margin-top: 2px; }
+
+/* description label + "Đọc ảnh / Hỏi AI" on one line */
+.label-row { align-items: center; gap: 10px; margin: 16px 0 6px; }
+.label-row .field-label { margin: 0; flex: 1; min-width: 0; }
+.label-actions { margin: 0; flex: none; }
+.chip-btn { white-space: nowrap; flex: none; }
+.seg button { white-space: nowrap; }
+
+/* mode cards: one-line description */
+.mode-texts strong, .mode-texts span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mode-card { min-width: 0; }
+
+/* preset facts + generate texts */
+.preset-facts { gap: 6px; }
+.gen-texts strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* column 2: candidates + source preview centered */
+.cand-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.toolbar-row { min-height: 32px; }
+.src-stage { min-height: 260px; align-items: center; }
+.src-stage canvas { max-width: 100%; height: auto !important; }
+
+/* column 3: preview centered, never clipped */
+.pv-stage { justify-content: center; align-items: center; min-height: 240px; max-height: none; overflow: auto; }
+.pv-stage > canvas { flex: none; }
+.pv-1x { align-items: center; }
+.forge .review .row-actions, .forge-col.review .btn-primary.big { margin-top: 16px; }
+.forge-col.review > .btn-ghost.sm { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; }
+
+/* notes: icon + text on one line, link at the end */
+.note { align-items: center; }
+.note > svg { flex: none; }
+
+@media (max-width: 1280px) {
+  .forge-body { grid-template-columns: 380px 1fr; }
+  .forge-col.review { grid-column: 1 / -1; border-top: 1px solid var(--border); }
+}
+@media (max-width: 900px) {
+  .forge-body { grid-template-columns: 1fr; }
+  .forge-col > h3 { position: static; }
+}
+
+/* ---------- near-fullscreen modal (sheet slicer) ---------- */
+.modal.modal-xl { height: calc(100vh - 32px); }
+.modal-xl .modal-body { flex: 1; min-height: 0; overflow: hidden; display: flex; padding: 14px 18px 16px; }
+.modal-xl .slicer { flex: 1; min-height: 0; height: 100%; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: stretch; }
+.modal-xl .slicer-stage { height: 100%; min-height: 0; justify-content: center; overflow: hidden; }
+.modal-xl .slicer-canvas { flex: none; }
+.modal-xl .slicer-side { height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 8px; }
+.modal-xl .slicer-actions { position: sticky; bottom: 0; z-index: 2; margin-top: 16px; padding: 12px 0 2px; background: linear-gradient(rgba(17,17,22,0), var(--bg-2) 18%); }
+.modal-xl .anim-preview { max-height: 46vh; }
+@media (max-width: 1100px) { .modal.modal-xl { height: auto; } .modal-xl .modal-body { overflow: auto; display: block; } .modal-xl .slicer { grid-template-columns: 1fr; height: auto; } .modal-xl .slicer-stage { height: 60vh; } .modal-xl .slicer-side { height: auto; overflow: visible; } }

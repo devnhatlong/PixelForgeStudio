@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Film, Grid3x3, Pause, Play, ScanSearch, SquarePlus, CheckSquare, XSquare } from "lucide-react";
+import { Film, Grid3x3, Pause, Play, ScanSearch, SquarePlus, CheckSquare, XSquare, PenSquare, Trash2, Copy } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Loading";
 import type { RgbaImage } from "@/lib/png-to-pixel";
-import type { CleanupConfig, SpritePreset } from "@/types/sprite";
+import type { AnimationState, CleanupConfig, SpritePreset } from "@/types/sprite";
 import type { PixelDocument } from "@/types/editor";
 import { createDocument, uid } from "@/lib/document";
 import { cropCells, detectSprites, foregroundMask, gridCells, groupRows, type GridSpec, type Rect } from "@/lib/sprite/slicer";
 import { buildAnimationFrames, type AnimationResult, type FrameAlign } from "@/lib/sprite/animation";
 import { rgbaToCanvas } from "@/lib/sprite/assets";
 import { BgPicker, PixelPreview, type PreviewBg } from "./Previews";
+import { ANIMATION_STATES } from "@/lib/sprite/anim-states";
 
-const VIEW_MAX = 640;
+/** max upscale of small sheets in the view */
+const MAX_VIEW_SCALE = 3;
 
 export interface SlicedCell {
   rgba: RgbaImage;
@@ -46,7 +48,11 @@ export function SheetSlicerModal({
   onAddCandidates: (cells: SlicedCell[]) => void;
   onCreateAnimation: (doc: PixelDocument) => void;
 }) {
-  const [method, setMethod] = useState<"auto" | "grid">("auto");
+  const [method, setMethod] = useState<"auto" | "grid" | "manual">("auto");
+  const [manualRects, setManualRects] = useState<Rect[]>([]);
+  const [draft, setDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [clipState, setClipState] = useState<AnimationState>("idle");
+  const [clipName, setClipName] = useState("Idle");
   const [grid, setGrid] = useState<GridSpec>({ rows: 2, cols: 4, marginX: 0, marginY: 0, gapX: 0, gapY: 0 });
   const [minGap, setMinGap] = useState(Math.max(2, Math.round(Math.min(image.width, image.height) / 200)));
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -60,11 +66,37 @@ export function SheetSlicerModal({
   const [building, setBuilding] = useState(false);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
-  const k = Math.min(1, VIEW_MAX / Math.max(image.width, image.height));
+  // fit the sheet into the available stage area (re-measured on window resize)
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 900, h: 600 });
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setBox({ w: Math.max(200, e.contentRect.width), h: Math.max(200, e.contentRect.height - 28) }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const k = Math.min(MAX_VIEW_SCALE, box.w / image.width, box.h / image.height);
 
   const fgMask = useMemo(() => foregroundMask(image, cleanup), [image, cleanup]);
   const autoRects = useMemo(() => detectSprites(image, { cleanup, minGap, mask: fgMask }), [image, cleanup, minGap, fgMask]);
-  const rects: Rect[] = useMemo(() => (method === "auto" ? autoRects : gridCells(image.width, image.height, grid)), [method, autoRects, image, grid]);
+  const rects: Rect[] = useMemo(
+    () => (method === "auto" ? autoRects : method === "manual" ? manualRects : gridCells(image.width, image.height, grid)),
+    [method, autoRects, manualRects, image, grid],
+  );
+  /** cells whose content touches the cell border → effect / weapon probably cut by the frame (grid & manual only) */
+  const touching = useMemo(() => {
+    if (method === "auto") return new Set<number>();
+    const out = new Set<number>();
+    const W = image.width;
+    rects.forEach((r, i) => {
+      const x1 = Math.min(W, r.x + r.w) - 1,
+        y1 = Math.min(image.height, r.y + r.h) - 1;
+      for (let x = r.x; x <= x1 && !out.has(i); x++) if (fgMask[r.y * W + x] || fgMask[y1 * W + x]) out.add(i);
+      for (let y = r.y; y <= y1 && !out.has(i); y++) if (fgMask[y * W + r.x] || fgMask[y * W + x1]) out.add(i);
+    });
+    return out;
+  }, [method, rects, fgMask, image]);
   const rows = useMemo(() => groupRows(rects), [rects]);
 
   // first open: guess the grid from auto-detection, preselect the first row
@@ -79,6 +111,7 @@ export function SheetSlicerModal({
 
   useEffect(() => {
     setAlign(method === "grid" ? "cell" : "foot");
+    if (method === "manual" && !manualRects.length) setManualRects(autoRects);
     setSelected((s) => new Set([...s].filter((i) => i < rects.length)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method]);
@@ -93,7 +126,7 @@ export function SheetSlicerModal({
     c.width = Math.round(image.width * k);
     c.height = Math.round(image.height * k);
     const ctx = c.getContext("2d")!;
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = k < 1; // smooth when shrinking, crisp pixels when enlarging
     ctx.drawImage(rgbaToCanvas(image), 0, 0, c.width, c.height);
   }, [image, k]);
 
@@ -117,6 +150,13 @@ export function SheetSlicerModal({
       ctx.strokeStyle = on ? "#2fd3cf" : "rgba(255,255,255,0.35)";
       ctx.lineWidth = on ? 2 : 1;
       ctx.strokeRect(x, y, w, h);
+      if (touching.has(i)) {
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+        ctx.setLineDash([]);
+      }
       if (on) {
         const n = String(order.indexOf(i) + 1);
         const tw = ctx.measureText(n).width + 8;
@@ -126,7 +166,14 @@ export function SheetSlicerModal({
         ctx.fillText(n, x + 4, y + 11);
       }
     });
-  }, [rects, selected, order, image, k]);
+    if (draft) {
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.min(draft.x0, draft.x1) * k, Math.min(draft.y0, draft.y1) * k, Math.abs(draft.x1 - draft.x0) * k, Math.abs(draft.y1 - draft.y0) * k);
+      ctx.setLineDash([]);
+    }
+  }, [rects, selected, order, image, k, touching, draft]);
 
   // build animation frames (debounced)
   useEffect(() => {
@@ -153,10 +200,34 @@ export function SheetSlicerModal({
     return () => clearInterval(t);
   }, [playing, anim, fps]);
 
-  const toggleAt = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const toImg = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const b = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - b.left) / b.width) * image.width;
-    const y = ((e.clientY - b.top) / b.height) * image.height;
+    return { x: Math.max(0, Math.min(image.width, ((e.clientX - b.left) / b.width) * image.width)), y: Math.max(0, Math.min(image.height, ((e.clientY - b.top) / b.height) * image.height)) };
+  };
+  const onDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const p = toImg(e);
+    setDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+  };
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!draft || method !== "manual") return;
+    const p = toImg(e);
+    setDraft({ ...draft, x1: p.x, y1: p.y });
+  };
+  const onUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const d = draft;
+    setDraft(null);
+    if (!d) return;
+    const big = Math.abs(d.x1 - d.x0) * k > 6 && Math.abs(d.y1 - d.y0) * k > 6;
+    if (method === "manual" && big) {
+      const r = { x: Math.round(Math.min(d.x0, d.x1)), y: Math.round(Math.min(d.y0, d.y1)), w: Math.round(Math.abs(d.x1 - d.x0)), h: Math.round(Math.abs(d.y1 - d.y0)) };
+      setManualRects((rs) => [...rs, r]);
+      setSelected((s) => new Set([...s, manualRects.length]));
+      return;
+    }
+    toggleAt(e);
+  };
+  const toggleAt = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = toImg(e);
     const i = rects.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
     if (i < 0) return;
     setSelected((s) => {
@@ -175,6 +246,10 @@ export function SheetSlicerModal({
     const duration = Math.round(1000 / fps);
     doc.frames = anim.frames.map((pixels) => ({ id: uid("f"), duration, cels: { [layerId]: pixels } }));
     doc.palette = anim.palette;
+    doc.anchor = { ...preset.footAnchor };
+    const st = ANIMATION_STATES.find((x) => x.value === clipState)!;
+    doc.animations = [{ id: uid("tag"), name: clipName.trim() || st.label, state: clipState, from: 0, to: anim.frames.length - 1, fps, loop: st.loop }];
+    doc.name = `${name} - ${clipName.trim() || st.label}`;
     onCreateAnimation(doc);
   };
 
@@ -182,20 +257,24 @@ export function SheetSlicerModal({
   const current = anim?.frames[Math.min(frameIdx, (anim?.frames.length ?? 1) - 1)];
 
   return (
-    <Modal title="Cắt sprite sheet" subtitle={`${image.width}×${image.height} · ${rects.length} ô · chọn ô theo thứ tự đọc (trái→phải, trên→dưới)`} icon={Grid3x3} onClose={onClose} width={1200}>
+    <Modal title="Cắt sprite sheet" subtitle={`${image.width}×${image.height} · ${rects.length} ô · chọn ô theo thứ tự đọc (trái→phải, trên→dưới)`} icon={Grid3x3} onClose={onClose} width="min(1680px, calc(100vw - 32px))" className="modal-xl">
       <div className="slicer">
-        <div className="slicer-stage">
+        <div className="slicer-stage" ref={stageRef}>
           <div className="slicer-canvas checker" style={{ width: Math.round(image.width * k), height: Math.round(image.height * k) }}>
             <canvas ref={baseRef} />
-            <canvas ref={overlayRef} onClick={toggleAt} style={{ cursor: "pointer" }} />
+            <canvas ref={overlayRef} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={() => setDraft(null)} style={{ cursor: method === "manual" ? "crosshair" : "pointer" }} />
           </div>
-          <p className="muted small">Bấm vào ô để chọn / bỏ chọn. Số trên ô = thứ tự frame.</p>
+          <p className="muted small">
+            Bấm vào ô để chọn / bỏ chọn. Số trên ô = thứ tự frame.{method === "manual" && " Kéo chuột để vẽ ô mới."}
+            {touching.size > 0 && <span className="danger-text"> {touching.size} ô có nội dung chạm mép (viền đỏ) — hiệu ứng / vũ khí có thể bị cắt: nới lưới hoặc vẽ ô lớn hơn.</span>}
+          </p>
         </div>
 
         <div className="slicer-side forge">
           <div className="seg wide">
             <button className={method === "auto" ? "active" : ""} onClick={() => setMethod("auto")}><ScanSearch size={13} /> Tự dò</button>
             <button className={method === "grid" ? "active" : ""} onClick={() => setMethod("grid")}><Grid3x3 size={13} /> Lưới đều</button>
+            <button className={method === "manual" ? "active" : ""} onClick={() => setMethod("manual")} title="Vẽ / sửa ô bằng tay"><PenSquare size={13} /> Thủ công</button>
           </div>
 
           {method === "auto" ? (
@@ -203,6 +282,15 @@ export function SheetSlicerModal({
               <label className="field-label">Khoảng trống tối thiểu giữa các nhân vật: {minGap}px</label>
               <input type="range" min={1} max={40} value={minGap} onChange={(e) => setMinGap(Number(e.target.value))} />
               <p className="muted small">Tìm thấy {rects.length} nhân vật trong {rows.length} hàng. Nếu 2 nhân vật bị gộp làm một → giảm số này; nếu 1 nhân vật bị tách đôi → tăng lên.</p>
+            </>
+          ) : method === "manual" ? (
+            <>
+              <p className="muted small" style={{ marginTop: 10 }}>{rects.length} ô. Kéo trên ảnh để thêm ô; chọn ô rồi xóa ô sai.</p>
+              <div className="row-chips">
+                <button className="chip-btn" onClick={() => { setManualRects(autoRects); setSelected(new Set()); }}><Copy size={12} /> Lấy từ Tự dò</button>
+                <button className="chip-btn danger" disabled={!selected.size} onClick={() => { setManualRects((rs) => rs.filter((_, i) => !selected.has(i))); setSelected(new Set()); }}><Trash2 size={12} /> Xóa ô đã chọn</button>
+                <button className="chip-btn" onClick={() => { setManualRects([]); setSelected(new Set()); }}>Xóa hết</button>
+              </div>
             </>
           ) : (
             <div className="grid-spec">
@@ -254,6 +342,26 @@ export function SheetSlicerModal({
           </div>
           <label className="field-label">Tốc độ: {fps} FPS</label>
           <input type="range" min={1} max={24} value={fps} onChange={(e) => setFps(Number(e.target.value))} />
+          <div className="grid2">
+            <div>
+              <label className="field-label">Trạng thái</label>
+              <Select<AnimationState>
+                size="sm"
+                value={clipState}
+                onChange={(v) => {
+                  const st = ANIMATION_STATES.find((x) => x.value === v)!;
+                  setClipState(v);
+                  if (v !== "custom") setClipName(st.label);
+                  setFps(st.fps);
+                }}
+                options={ANIMATION_STATES.map((x) => ({ value: x.value, label: x.label, hint: `${x.fps} FPS` }))}
+              />
+            </div>
+            <div>
+              <label className="field-label">Tên clip</label>
+              <input className="text-input" style={{ height: 32 }} value={clipName} onChange={(e) => setClipName(e.target.value)} />
+            </div>
+          </div>
           <label className="field-label">Căn các frame</label>
           <Select<FrameAlign>
             value={align}

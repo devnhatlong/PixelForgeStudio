@@ -118,3 +118,19 @@ Kích thước canvas · sprite trống · góc/diện tích đặc (nghi còn n
 - Các giá trị preset (128×192, chân y=174, cao 120px, 28 màu) là **thử nghiệm** - sửa trong `client/src/config/sprite-presets.json` và tăng `version` khi đổi.
 - Mock provider chỉ để thử quy trình, không phải AI.
 - Hạn mức AI theo ngày lưu trong RAM (mất khi restart).
+
+## Bổ sung (P0 mở rộng)
+
+| Chức năng | Ở đâu | Ghi chú |
+| --- | --- | --- |
+| **Character DNA** | Master → Review → khung "Character DNA" (AI đọc DNA / sửa tay / Lưu) | Số liệu (màu nhận diện, kích thước) tự cập nhật khi Approve; phần chữ được chèn vào prompt của mọi variant/regenerate |
+| **So sánh với Master** | Sprite Forge cột 3 (variant) + Review variant | Điểm 0–100 từ: vùng đầu (IoU + màu), màu nhận diện, silhouette, chiều cao, vị trí chân — **chỉ là cảnh báo** |
+| **Sprite Sheet Analyzer** | Sprite Forge → Cắt grid | Tự dò / Lưới đều / **Thủ công** (kéo vẽ ô, lấy từ Tự dò rồi sửa); viền đỏ = nội dung chạm mép ô (VFX bị cắt); đặt trạng thái + tên clip |
+| **Pivot lock** | Editor → Timeline: Ground, Ghost (Frame 1 / Master), **Căn chân**, **Chỉ mặt đất**, chỉ số "lệch chân" | Căn chân dời cả frame (mọi layer), hoàn tác bằng Ctrl+Z |
+| **Animation Studio** | Timeline: nhãn trạng thái (Idle/Walk/Run/Jump/Attack/Hit/Death/Cast/Release/Khác), phát riêng từng nhãn, **Xem trong game** (nền cuộn, 1–4×, lật hướng) | Tốc độ cuộn không trượt chân = tốc độ di chuyển nên dùng trong Unity |
+| **Unity export** | Xuất File → tab "Unity (Atlas + Clip)" | ZIP: atlas PNG (padding 2px), `.pfanim.json` (rect gốc dưới-trái, pivot = mốc chân, clip/FPS/loop, chỗ trống cho events/attachments/hitboxes), `Editor/PixelForgeImporter.cs` (tự slice, tạo `.anim` + AnimatorController). Script chưa chạy thử trong Unity |
+| **Lịch sử & rollback** | Sprite Library → nút đồng hồ trên thẻ | Khôi phục = tạo bản mới (version +1, Draft) từ bản cũ, không ghi đè |
+
+### Chưa làm (P1) — đề xuất
+- **Weapon attachment & VFX**: điểm gắn (tay trái/phải, góc, z-order) theo từng frame, sprite vũ khí / VFX tách riêng, xuất vào `attachments` của `.pfanim.json`.
+- **Layer trang phục (Body/Hair/Outfit/Weapon/Accessory)**: gán vai trò cho layer, tách vùng bằng mask/cọ, thay bộ phận theo master.

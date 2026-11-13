@@ -6,17 +6,20 @@ import { useEditorStore } from "@/store/editor-store";
 import { renderFrameToCanvas } from "@/lib/raster";
 import { downloadBlob, safeName } from "@/lib/pforge";
 import { computeSheetGrid, exportFramesZip, exportGif, exportPng, exportSpriteSheet, type Background, type SheetLayout } from "@/lib/export";
-import { Download, FolderArchive, Film, Image, Info, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Download, FolderArchive, Film, Image, Info, LayoutGrid, Gamepad2, type LucideIcon } from "lucide-react";
+import { buildUnityJson, exportUnityPackage } from "@/lib/sprite/unity-export";
+import { docAnchor, validTags } from "@/store/anim-store";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Loading";
 
-type Tab = "png" | "zip" | "gif" | "sheet";
+type Tab = "png" | "zip" | "gif" | "sheet" | "unity";
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "png", label: "Ảnh tĩnh PNG", icon: Image },
   { id: "zip", label: "Từng Frames (ZIP / Game)", icon: FolderArchive },
   { id: "gif", label: "Ảnh động GIF", icon: Film },
   { id: "sheet", label: "Sprite Sheet + JSON", icon: LayoutGrid },
+  { id: "unity", label: "Unity (Atlas + Clip)", icon: Gamepad2 },
 ];
 
 function BgPicker({ value, onChange }: { value: Background; onChange: (b: Background) => void }) {
@@ -62,6 +65,9 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
   const [spacing, setSpacing] = useState(1);
   const [sheetScale, setSheetScale] = useState(4);
 
+  const [ppu, setPpu] = useState(64);
+  const [unityInfo, setUnityInfo] = useState<string>("");
+
   const [preview, setPreview] = useState<string>("");
   const [gifPreviewIndex, setGifPreviewIndex] = useState(0);
 
@@ -80,12 +86,23 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
       else if (tab === "sheet") {
         const r = await exportSpriteSheet(doc, { layout, columns, spacing, scale: Math.min(sheetScale, 4) });
         if (!cancelled) setPreview(r.canvas.toDataURL());
+      } else if (tab === "unity") {
+        const { json, layout } = buildUnityJson(doc, { tags: validTags(doc), anchor: docAnchor(doc), pixelsPerUnit: ppu });
+        const c = document.createElement("canvas");
+        c.width = layout.width;
+        c.height = layout.height;
+        const cx = c.getContext("2d")!;
+        doc.frames.forEach((f, i) => cx.drawImage(renderFrameToCanvas(doc, f, 1, "transparent"), layout.cells[i].x, layout.cells[i].y));
+        if (!cancelled) {
+          setPreview(c.toDataURL());
+          setUnityInfo(`Atlas ${layout.width}×${layout.height} · ${json.frames.length} sprite · ${json.clips.length} clip: ${json.clips.map((x) => `${x.name} (${x.frames.length}f, ${x.fps}fps${x.loop ? ", lặp" : ""})`).join(", ")}`);
+        }
       } else setPreview("");
     })();
     return () => {
       cancelled = true;
     };
-  }, [doc, tab, pngFrame, pngScale, pngBg, gifPreviewIndex, gifBg, layout, columns, spacing, sheetScale]);
+  }, [doc, tab, pngFrame, pngScale, pngBg, gifPreviewIndex, gifBg, layout, columns, spacing, sheetScale, ppu]);
 
   const sheetInfo = useMemo(() => (doc ? computeSheetGrid(doc.frames.length, { layout, columns, spacing, scale: sheetScale }) : { cols: 1, rows: 1 }), [doc, layout, columns, spacing, sheetScale]);
 
@@ -132,6 +149,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
                 {tab === "png" && `Kích thước xuất: ${doc.width * pngScale} x ${doc.height * pngScale} px (${pngScale}x)`}
                 {tab === "gif" && `${doc.frames.length} Khung hình | timing theo từng frame | ${doc.width * gifScale}x${doc.height * gifScale} px`}
                 {tab === "sheet" && `Sprite Atlas Tối Ưu Cho Game Engine - ${sheetInfo.cols} cột x ${sheetInfo.rows} hàng`}
+                {tab === "unity" && unityInfo}
               </div>
             </>
           )}
@@ -239,6 +257,37 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
                 {busy ? <Spinner size={15} /> : <Download size={15} />} Tải Sprite Sheet PNG + File JSON
               </button>
               <div className="muted small center">Tương thích Unity, Godot, Phaser, GameMaker & Web Engines</div>
+            </>
+          )}
+
+          {tab === "unity" && (
+            <>
+              <div className="note">
+                <strong><Info size={13} /> Nhập tự động vào Unity</strong>
+                <p className="small">
+                  Gói gồm atlas PNG (1×, padding 2px), <code>.pfanim.json</code> (rect, pivot = mốc chân, clip theo nhãn trạng thái) và script <code>Editor/PixelForgeImporter.cs</code>.
+                  Chép script vào Unity một lần; sau đó thả PNG + JSON vào Assets là tự tạo sprite, file <code>.anim</code> và Animator Controller.
+                </p>
+              </div>
+              <label className="field-label">Pixels Per Unit (PPU): {ppu}</label>
+              <div className="seg wide">
+                {[16, 32, 64, 100, 128].map((n) => <button key={n} className={ppu === n ? "active" : ""} onClick={() => setPpu(n)}>{n}</button>)}
+              </div>
+              <p className="muted small">Nhân vật cao {doc.height}px ≈ {(doc.height / ppu).toFixed(2)} unit trong Unity. Dùng cùng một PPU cho mọi nhân vật.</p>
+              {!validTags(doc).length && <p className="note warn">Chưa có nhãn trạng thái — sẽ xuất 1 clip &quot;Default&quot; gồm mọi frame. Thêm nhãn (Idle, Run…) ở thanh Timeline.</p>}
+              <button
+                className="btn-primary big"
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() =>
+                  run(async () => {
+                    const r = await exportUnityPackage(doc, { tags: validTags(doc), anchor: docAnchor(doc), pixelsPerUnit: ppu });
+                    downloadBlob(r.zip, `${name}_unity.zip`);
+                  })
+                }
+              >
+                {busy ? <Spinner size={15} /> : <Gamepad2 size={15} />} Tải gói Unity (.zip)
+              </button>
             </>
           )}
         </div>

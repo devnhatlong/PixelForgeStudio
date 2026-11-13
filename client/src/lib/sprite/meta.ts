@@ -1,6 +1,7 @@
 import type { PixelDocument } from "@/types/editor";
 import type { SpriteMeta, SpriteStatus, SpriteSummary } from "@/types/sprite";
 import { hashPixels, type PixelImage } from "./quality";
+import { deriveDna } from "./dna";
 
 export const STATUS_LABEL: Record<SpriteStatus, string> = { draft: "Draft", reviewed: "Reviewed", approved: "Approved" };
 export const STATUS_ORDER: SpriteStatus[] = ["draft", "reviewed", "approved"];
@@ -57,7 +58,11 @@ export function withStatus(doc: PixelDocument, status: SpriteStatus, note?: stri
   if (status === "approved") {
     sprite.approvedHash = hashPixels(flat.pixels);
     sprite.approvedAt = now;
-    if (sprite.kind === "master") sprite.lockedPalette = Array.from(new Set(flat.pixels.filter(Boolean)));
+    if (sprite.kind === "master") {
+      sprite.lockedPalette = Array.from(new Set(flat.pixels.filter(Boolean)));
+      // refresh DNA numbers from the approved pixels, keep the user's traits text
+      sprite.dna = deriveDna(flat, sprite.dna?.traits ?? "", sprite.dna?.notes ?? "");
+    }
   } else {
     sprite.approvedHash = null;
     sprite.approvedAt = null;

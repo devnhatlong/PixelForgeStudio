@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Wand2, ImageUp, Sparkles, Save, AlertTriangle, Layers, Eye, EyeOff, RefreshCw, Crown, Shirt, X, Lock, Settings, ImagePlus, ScanEye, MessageSquare, Bot, Trash2, Grid3x3 } from "lucide-react";
+import { ArrowLeft, Wand2, ImageUp, Sparkles, Save, AlertTriangle, Layers, Eye, EyeOff, RefreshCw, Crown, Shirt, X, Lock, Settings, ImagePlus, ScanEye, MessageSquare, Bot, Trash2, Grid3x3, Dna } from "lucide-react";
 import { AI_CHANGED_EVENT } from "./AiSettingsModal";
 import { STUDIO_PATH, useProjectActions } from "@/hooks/useProjectActions";
 import { useAppStore } from "@/store/app-store";
@@ -22,6 +22,8 @@ import { base64ToBlob, blobToRgba, canvasToPng, getAssetBlob, rgbaToPng, saveAss
 import { describeImage, generateImages, getAiInfo, type AiGenerateResult, type AiInfo } from "@/lib/sprite/ai-client";
 import { AiAssistant } from "./AiAssistant";
 import { SheetSlicerModal } from "./SheetSlicerModal";
+import { DnaCompareCard } from "./Dna";
+import { compareToMaster, dnaPrompt } from "@/lib/sprite/dna";
 import type { PixelDocument, ProjectSummary } from "@/types/editor";
 import type { CleanupConfig, GenerationInfo, PixelConfig, SpriteMeta, SpritePose, SpriteView } from "@/types/sprite";
 import { BgPicker, PixelPreview, RgbaPreview, ZoomPicker, type PreviewBg } from "./Previews";
@@ -328,6 +330,11 @@ export function SpriteForge() {
     return srcView === "mask" ? alphaMaskImage(result.cleanup.image, pixel.alphaThreshold) : result.cleanup.image;
   }, [selected, result, srcView, pixel.alphaThreshold]);
 
+  const dnaCmp = useMemo(
+    () => (result && masterFlat && mode === "variant" ? compareToMaster({ width: preset.canvas.width, height: preset.canvas.height, pixels: result.pixels }, masterFlat, masterDoc?.sprite?.dna) : null),
+    [result, masterFlat, mode, preset.canvas.width, preset.canvas.height, masterDoc?.sprite?.dna],
+  );
+
   const quality = useMemo(() => {
     if (!result) return null;
     return runQualityChecks({ width: preset.canvas.width, height: preset.canvas.height, pixels: result.pixels }, preset, {
@@ -347,8 +354,9 @@ export function SpriteForge() {
       : mode === "variant"
         ? `\nThe first input image is the character to keep. The other ${n} image(s) are ART STYLE examples only: match their drawing style (pixel density, outline, shading, palette feel), do not copy their characters or content.`
         : `\nThe ${n} input image(s) are ART STYLE examples only: draw a NEW character as described, matching their drawing style (pixel density, outline thickness, shading, color palette feel, proportions). Do not copy the characters, faces, clothing or content of the examples.`;
-    return mode === "variant" ? `${VARIANT_PREFIX} ${prompt.trim()}.\nStyle: ${style}${styleNote}` : `${core}.\nStyle: ${style}${styleNote}`;
-  }, [prompt, view, pose, mode, basePreset.stylePrompt, styleRefs.length]);
+    const dnaText = dnaPrompt(mode === "variant" ? masterDoc?.sprite?.dna : regenFrom?.sprite?.dna);
+    return mode === "variant" ? `${VARIANT_PREFIX} ${prompt.trim()}.${dnaText}\nStyle: ${style}${styleNote}` : `${core}.${dnaText}\nStyle: ${style}${styleNote}`;
+  }, [prompt, view, pose, mode, basePreset.stylePrompt, styleRefs.length, masterDoc?.sprite?.dna, regenFrom?.sprite?.dna]);
 
   const addStyleFiles = async (files: FileList | File[] | null) => {
     if (!files) return;
@@ -594,6 +602,11 @@ export function SpriteForge() {
                 onChange={(id) => loadMaster(id)}
               />
               {!masters.length && <p className="muted small">Chưa có master nào. Tạo master trước.</p>}
+              {masterDoc && (masterDoc.sprite?.dna?.traits ? (
+                <p className="note dna-note" title={masterDoc.sprite.dna.traits}><Dna size={13} /> DNA được chèn vào prompt: <span className="clamp">{masterDoc.sprite.dna.traits}</span></p>
+              ) : (
+                <p className="note warn"><AlertTriangle size={13} /> Master chưa có Character DNA — mở master → Review → "AI đọc DNA" để khóa nhận diện tốt hơn.</p>
+              ))}
               {masterDoc && masterDoc.sprite?.status !== "approved" && <p className="note warn"><AlertTriangle size={13} /> Master chưa Approved - nên duyệt master trước khi làm variant.</p>}
               {reference && (
                 <>
@@ -690,7 +703,7 @@ export function SpriteForge() {
           )}
 
           <div className="label-row">
-            <label className="field-label">{mode === "variant" ? "Mô tả trang phục mới" : "Mô tả nhân vật"} <span className="label-opt">tiếng Anh tốt hơn</span></label>
+            <label className="field-label" title="Viết bằng tiếng Anh cho kết quả tốt hơn">{mode === "variant" ? "Mô tả trang phục mới" : "Mô tả nhân vật"}</label>
             <div className="label-actions">
               <label className={`chip-btn ${reading ? "busy" : ""}`} title={mode === "variant" ? "Tải hình trang phục bạn thích — AI viết mô tả trang phục" : "Tải hình nhân vật / concept — AI xem và viết mô tả"}>
                 {reading ? <Spinner size={12} /> : <ScanEye size={13} />} Đọc ảnh
@@ -734,8 +747,12 @@ export function SpriteForge() {
               </div>
             </div>
             <div>
-              <label className="field-label">Seed {aiInfo && !aiInfo.capabilities.seed && <span className="muted">(provider không hỗ trợ)</span>}</label>
-              <input className="text-input" value={seed} placeholder="ngẫu nhiên" onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))} />
+              <label className="field-label" title="Cùng seed + cùng prompt → cùng kết quả (nếu provider hỗ trợ)">Seed</label>
+              {aiInfo && !aiInfo.capabilities.seed ? (
+                <input className="text-input" disabled placeholder="Model không hỗ trợ" title="OpenAI không nhận seed — mỗi lần Generate cho kết quả khác" />
+              ) : (
+                <input className="text-input" value={seed} placeholder="Ngẫu nhiên" inputMode="numeric" onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))} />
+              )}
             </div>
           </div>
 
@@ -897,10 +914,15 @@ export function SpriteForge() {
                   </div>
                   <label className="field-label">Ngưỡng màu nền: {cleanup.tolerance}</label>
                   <input type="range" min={0} max={160} value={cleanup.tolerance} onChange={(e) => setCleanup({ ...cleanup, tolerance: Number(e.target.value) })} />
-                  <label className="field-label">Gọt viền sáng (halo): {cleanup.haloPasses} lượt, ngưỡng {cleanup.haloTolerance}</label>
                   <div className="grid2">
-                    <input type="range" min={0} max={6} value={cleanup.haloPasses} onChange={(e) => setCleanup({ ...cleanup, haloPasses: Number(e.target.value) })} />
-                    <input type="range" min={0} max={250} value={cleanup.haloTolerance} onChange={(e) => setCleanup({ ...cleanup, haloTolerance: Number(e.target.value) })} />
+                    <div>
+                      <label className="field-label" title="Số lượt gọt bỏ viền sáng (halo) quanh nhân vật">Gọt halo: {cleanup.haloPasses} lượt</label>
+                      <input type="range" min={0} max={6} value={cleanup.haloPasses} onChange={(e) => setCleanup({ ...cleanup, haloPasses: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                      <label className="field-label" title="Pixel viền gần màu nền hơn ngưỡng này sẽ bị gọt">Ngưỡng halo: {cleanup.haloTolerance}</label>
+                      <input type="range" min={0} max={250} value={cleanup.haloTolerance} onChange={(e) => setCleanup({ ...cleanup, haloTolerance: Number(e.target.value) })} />
+                    </div>
                   </div>
                   {result && <p className="muted small">Đã xóa {result.cleanup.removedCount.toLocaleString()} px nền + {result.cleanup.haloRemoved.toLocaleString()} px halo. Ảnh gốc không bị sửa.</p>}
                 </>
@@ -999,6 +1021,7 @@ export function SpriteForge() {
                 </p>
               )}
 
+              {dnaCmp && <DnaCompareCard c={dnaCmp} />}
               <h4>Kiểm tra tự động</h4>
               <QualityList issues={quality?.issues ?? []} extraWarnings={result.warnings} />
 

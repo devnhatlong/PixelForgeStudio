@@ -17,9 +17,11 @@ export const VISION_MODEL_SUGGESTIONS = [
   { id: "gpt-6-astra", hint: "Mạnh nhất, đắt nhất" },
 ];
 
-export type DescribePurpose = "character" | "outfit" | "style";
+export type DescribePurpose = "character" | "outfit" | "style" | "dna";
 
 const DESCRIBE_INSTRUCTIONS: Record<DescribePurpose, string> = {
+  dna:
+    "You define the CHARACTER DNA of a game character: the identity traits that must stay identical in every outfit and animation frame. From the image, list in concise English, comma-separated: gender and apparent age, face shape, eye shape and eye color, eyebrows, skin tone, hairstyle (length, parting, buns/topknot, bangs) and exact hair color, distinctive marks (scars, beauty marks, tattoos), head-to-body ratio and build, signature colors that identify the character. Do NOT mention clothing, weapons, pose, background or art style. Max 80 words, no preface.",
   character:
     "You help a non-artist make a 2D pixel-art game (chibi, ancient Eastern / wuxia setting). Look at the image and write ONE concise English prompt for an image generator describing ONLY the character's design: gender and apparent age, face, hairstyle and hair color, outfit layers with colors and materials, accessories, weapon. Do NOT mention background, pose, camera angle, lighting or art style. Max 70 words, a single paragraph, no preface, no quotes.",
   outfit:
@@ -184,7 +186,7 @@ export class VisionService {
     const mime = sniffMime(file.buffer);
     if (!mime) throw new HttpException("Chỉ nhận PNG/JPEG/WebP", HttpStatus.BAD_REQUEST);
     if (file.size > MAX_IMAGE_BYTES * 2) throw new HttpException("Ảnh quá lớn (tối đa 8MB)", HttpStatus.BAD_REQUEST);
-    const p: DescribePurpose = purpose === "outfit" || purpose === "style" ? purpose : "character";
+    const p: DescribePurpose = purpose === "outfit" || purpose === "style" || purpose === "dna" ? purpose : "character";
     this.count(userKey);
     if (this.mode === "mock") return { text: mockDescribe(file.buffer, p), model: "mock-vision", usage: null, mock: true };
     const dataUrl = `data:${mime};base64,${file.buffer.toString("base64")}`;
@@ -232,6 +234,7 @@ export function mockDescribe(buf: Buffer, purpose: DescribePurpose): string {
     /* not png */
   }
   const color = hueName(dominantHue(buf));
+  if (purpose === "dna") return `[MOCK${size}] young man about 18, oval face, sharp amber eyes, straight dark eyebrows, fair skin, long black hair tied in a high topknot with side bangs, slim build, head about one third of total height, signature ${color} accents`;
   if (purpose === "style") return `[MOCK${size}] clean pixel art, 1px dark outline, flat cel shading with one shadow tone, limited palette dominated by ${color}, chibi proportions with large head`;
   if (purpose === "outfit") return `[MOCK${size}] layered ${color} wuxia robe with darker trim, wide cloth belt, fitted sleeves, dark trousers and simple cloth boots`;
   return `[MOCK${size}] young male swordsman, calm face, long black hair tied in a topknot, ${color} and black wuxia robe with wide belt, dark trousers, cloth boots, straight jian sword at the waist`;

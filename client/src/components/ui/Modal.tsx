@@ -10,13 +10,17 @@ export function Modal({
   onClose,
   children,
   width = 560,
+  className = "",
 }: {
   title: string;
   subtitle?: string;
   icon?: LucideIcon;
   onClose: () => void;
   children: React.ReactNode;
-  width?: number;
+  /** px number or any CSS width (e.g. "min(1680px, 96vw)") */
+  width?: number | string;
+  /** extra class on the dialog (e.g. "modal-xl" for near-fullscreen tools) */
+  className?: string;
 }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -26,7 +30,7 @@ export function Modal({
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ width, maxWidth: "calc(100vw - 32px)" }} role="dialog" aria-modal>
+      <div className={`modal ${className}`} style={{ width, maxWidth: "calc(100vw - 32px)" }} role="dialog" aria-modal>
         <div className="modal-head">
           {Icon && <span className="modal-icon"><Icon size={18} /></span>}
           <div className="modal-titles">

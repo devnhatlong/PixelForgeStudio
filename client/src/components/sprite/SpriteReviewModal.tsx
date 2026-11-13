@@ -12,7 +12,9 @@ import { downloadBlob } from "@/lib/pforge";
 import { flattenFrame, isEditedAfterApproval, spriteAssetId, STATUS_LABEL, STATUS_ORDER, withStatus } from "@/lib/sprite/meta";
 import { runQualityChecks } from "@/lib/sprite/quality";
 import { exportSpriteFiles, exportSpritesZip } from "@/lib/sprite/export-sprite";
-import { getAssetBlob, ensureAssetsUploaded } from "@/lib/sprite/assets";
+import { canvasToPng, getAssetBlob, ensureAssetsUploaded } from "@/lib/sprite/assets";
+import { compareToMaster, deriveDna } from "@/lib/sprite/dna";
+import { DnaCompareCard, DnaEditor } from "./Dna";
 import type { PixelDocument } from "@/types/editor";
 import type { SpriteStatus } from "@/types/sprite";
 import { BgPicker, PixelPreview, ZoomPicker, type PreviewBg } from "./Previews";
@@ -58,8 +60,31 @@ export function SpriteReviewModal({ onClose }: { onClose: () => void }) {
       paletteStrict: sprite.pixel?.paletteMode === "master",
     });
   }, [flat, sprite, masterFlat, master]);
+  const dnaCmp = useMemo(
+    () => (flat && masterFlat && sprite?.kind === "variant" ? compareToMaster(flat, masterFlat, master?.sprite?.dna) : null),
+    [flat, masterFlat, sprite?.kind, master?.sprite?.dna],
+  );
 
   if (!doc || !sprite || !flat) return null;
+
+  /** image used by "AI đọc DNA": the stored source, else the pixels enlarged ×8 on white */
+  const dnaImage = async (): Promise<Blob | null> => {
+    const src = await getAssetBlob(sprite.sourceAssetId).catch(() => null);
+    if (src) return src;
+    const k = 8;
+    const c = document.createElement("canvas");
+    c.width = doc.width * k;
+    c.height = doc.height * k;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    flat.pixels.forEach((p, i) => {
+      if (!p) return;
+      ctx.fillStyle = p;
+      ctx.fillRect((i % doc.width) * k, Math.floor(i / doc.width) * k, k, k);
+    });
+    return canvasToPng(c);
+  };
   const edited = isEditedAfterApproval(doc);
 
   const setStatus = (s: SpriteStatus) => {
@@ -134,6 +159,30 @@ export function SpriteReviewModal({ onClose }: { onClose: () => void }) {
           </div>
           {edited && <p className="note warn">Đã sửa pixel sau khi Approved - cần duyệt lại (bấm Approved lần nữa).</p>}
           <input className="text-input" placeholder="Ghi chú duyệt (tùy chọn)" value={note} onChange={(e) => setNote(e.target.value)} />
+
+          {sprite.kind === "master" && (
+            <DnaEditor
+              key={sprite.dna?.updatedAt ?? 0}
+              dna={sprite.dna}
+              getImage={dnaImage}
+              onSave={(traits, notes) => {
+                updateMeta((d) =>
+                  d.sprite
+                    ? {
+                        ...d,
+                        sprite: {
+                          ...d.sprite,
+                          dna: { ...(d.sprite.dna ?? deriveDna(flattenFrame(d))), traits, notes, updatedAt: Date.now() },
+                          history: [...d.sprite.history, { at: Date.now(), action: "dna-updated" }],
+                        },
+                      }
+                    : d,
+                );
+                notify("Đã lưu Character DNA — variant / animation mới sẽ dùng nó trong prompt", "success");
+              }}
+            />
+          )}
+          {dnaCmp && <DnaCompareCard c={dnaCmp} />}
 
           <h4>Kiểm tra tự động</h4>
           <QualityList issues={report?.issues ?? []} />

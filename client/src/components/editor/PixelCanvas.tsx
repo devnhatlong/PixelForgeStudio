@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorStore, type PaintMode } from "@/store/editor-store";
+import { docAnchor, useAnimStore } from "@/store/anim-store";
 import {
   bresenham,
   brushPoints,
@@ -56,6 +57,9 @@ export function PixelCanvas() {
   const selection = useEditorStore((s) => s.selection);
   const floating = useEditorStore((s) => s.floating);
   const playing = useEditorStore((s) => s.playing);
+  const showGuides = useAnimStore((s) => s.showGuides);
+  const ghostPixels = useAnimStore((s) => s.ghostPixels);
+  const ghostOpacity = useAnimStore((s) => s.ghostOpacity);
 
   const setDragBoth = (d: DragState) => {
     dragRef.current = d;
@@ -111,6 +115,18 @@ export function PixelCanvas() {
       const next = doc.frames[frameIndex + 1];
       if (prev) blit(compositeFrame(doc, prev), 0.3);
       if (next) blit(compositeFrame(doc, next), 0.2);
+    }
+
+    // ghost (master / frame 1) under the current frame — alignment reference, never saved
+    if (ghostPixels && ghostPixels.length === width * height) {
+      ctx.globalAlpha = ghostOpacity;
+      for (let i = 0; i < ghostPixels.length; i++) {
+        const g = ghostPixels[i];
+        if (!g) continue;
+        ctx.fillStyle = g;
+        ctx.fillRect((i % width) * zoom, Math.floor(i / width) * zoom, zoom, zoom);
+      }
+      ctx.globalAlpha = 1;
     }
 
     blit(compositeFrame(doc, frame));
@@ -242,7 +258,30 @@ export function PixelCanvas() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [doc, frameIndex, zoom, showGrid, gridSize, gridAuto, gridOpacity, onionSkin, tool, primary, brushSize, mirror, selection, floating, drag, hover, playing, layerId]);
+
+    // ground line + pivot (feet anchor) — pivot lock guides
+    if (showGuides) {
+      const a = docAnchor(doc);
+      const gy = (a.y + 1) * zoom - 0.5;
+      ctx.strokeStyle = "rgba(255,170,40,0.9)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(canvas.width, gy);
+      ctx.stroke();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = "rgba(255,170,40,0.55)";
+      ctx.beginPath();
+      ctx.moveTo(a.x * zoom + 0.5, 0);
+      ctx.lineTo(a.x * zoom + 0.5, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,170,40,0.95)";
+      ctx.beginPath();
+      ctx.arc(a.x * zoom + 0.5, gy, Math.max(3, zoom / 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [doc, frameIndex, zoom, showGrid, gridSize, gridAuto, gridOpacity, onionSkin, tool, primary, brushSize, mirror, selection, floating, drag, hover, playing, layerId, showGuides, ghostPixels, ghostOpacity]);
 
   const toPixel = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>): Point => {

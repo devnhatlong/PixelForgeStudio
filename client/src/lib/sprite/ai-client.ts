@@ -114,7 +114,7 @@ export async function generateImages(input: AiGenerateInput, signal?: AbortSigna
 
 /* ---------------- image understanding & chat ---------------- */
 
-export type DescribePurpose = "character" | "outfit" | "style";
+export type DescribePurpose = "character" | "outfit" | "style" | "dna";
 
 export interface VisionReply {
   text: string;

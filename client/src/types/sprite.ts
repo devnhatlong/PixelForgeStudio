@@ -130,6 +130,8 @@ export interface SpriteMeta {
   maskAssetId?: string | null;
   /** art-style example images (asset ids); variants of this master reuse them by default */
   styleAssetIds?: string[] | null;
+  /** identity lock of the character (masters); variants & animations must match it */
+  dna?: CharacterDna | null;
   generation: GenerationInfo | null;
   cleanup?: CleanupConfig | null;
   normalize?: NormalizeInfo | null;
@@ -156,4 +158,52 @@ export interface QualityIssue {
   id: string;
   level: "error" | "warn" | "info";
   message: string;
+}
+
+/**
+ * Character DNA: invariant identity of a character, stored on the approved master.
+ * The text traits are injected into every variant / animation prompt; the numbers drive comparisons.
+ */
+export interface CharacterDna {
+  /** English, generator-ready list of identity traits (face, eyes, hair, proportions, signature colours…) */
+  traits: string;
+  /** what may change between outfits (free text, for the user) */
+  notes?: string;
+  /** master colours that define identity (skin, hair, eyes, outline) */
+  keyColors: string[];
+  /** content size of the master on the canvas (px) */
+  bodyWidth: number;
+  bodyHeight: number;
+  updatedAt: number;
+}
+
+/** Similarity of a sprite to its master. Heuristics only — never a guarantee of identity. */
+export interface DnaComparison {
+  /** 0..100, weighted summary */
+  score: number;
+  silhouetteIoU: number;
+  /** silhouette overlap of the head region (top third of the master's body) */
+  headIoU: number;
+  heightDiffPct: number;
+  widthDiffPct: number;
+  footDelta: { dx: number; dy: number };
+  /** share of the master's key colours still present */
+  keyColorsKept: number;
+  /** mean RGB distance (0..441) of the head region pixels to the master's head colours */
+  headColorDistance: number;
+  verdict: "match" | "check" | "drift";
+}
+
+export type AnimationState = "idle" | "run" | "walk" | "jump" | "attack" | "hit" | "death" | "cast" | "release" | "custom";
+
+/** A named frame range of a document (exported as a Unity AnimationClip). */
+export interface AnimationTag {
+  id: string;
+  name: string;
+  state: AnimationState;
+  /** inclusive frame indices */
+  from: number;
+  to: number;
+  fps: number;
+  loop: boolean;
 }

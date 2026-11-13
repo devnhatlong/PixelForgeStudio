@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Download, FolderInput, RefreshCw, Shirt, Wand2 } from "lucide-react";
+import { Crown, Download, FolderInput, RefreshCw, Shirt, Wand2, History, Undo2 } from "lucide-react";
 import { listProjects } from "@/lib/storage";
 import { ensureLocalDocument } from "@/lib/sync";
 import { downloadBlob } from "@/lib/pforge";
@@ -12,6 +12,7 @@ import { useProjectActions } from "@/hooks/useProjectActions";
 import { useAppStore } from "@/store/app-store";
 import { ProjectGridSkeleton, Spinner } from "@/components/ui/Loading";
 import { Select } from "@/components/ui/Select";
+import { cloneDocument, uid } from "@/lib/document";
 import type { PixelDocument, ProjectSummary } from "@/types/editor";
 import type { SpriteStatus } from "@/types/sprite";
 
@@ -24,7 +25,31 @@ interface Group {
 export function SpriteLibrary() {
   const router = useRouter();
   const notify = useAppStore((s) => s.notify);
-  const { openById } = useProjectActions();
+  const { openById, openDocument } = useProjectActions();
+  const [historyOpen, setHistoryOpen] = useState<string | null>(null);
+
+  /** Rollback: copy an older version into a NEW version (latest + 1) — nothing is overwritten. */
+  const restore = async (old: ProjectSummary, latestVersion: number) => {
+    const d = await ensureLocalDocument(old.id).catch(() => undefined);
+    if (!d?.sprite) return notify("Không mở được bản này", "error");
+    if (!confirm(`Khôi phục v${d.sprite.version} thành bản mới v${latestVersion + 1}? Các bản hiện có được giữ nguyên.`)) return;
+    const now = Date.now();
+    const copy = cloneDocument(d);
+    copy.id = uid("d");
+    copy.createdAt = copy.updatedAt = now;
+    copy.name = `${d.name.replace(/ v\d+$/, "")} v${latestVersion + 1}`;
+    copy.sprite = {
+      ...d.sprite,
+      status: "draft",
+      approvedHash: null,
+      approvedAt: null,
+      version: latestVersion + 1,
+      previousVersionId: d.id,
+      history: [...d.sprite.history, { at: now, action: "rollback", note: `khôi phục từ v${d.sprite.version} (${d.id})` }],
+    };
+    await openDocument(copy);
+    notify(`Đã khôi phục thành v${latestVersion + 1} (Draft) — duyệt lại để dùng`, "success");
+  };
   const [items, setItems] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
@@ -80,8 +105,22 @@ export function SpriteLibrary() {
     }
   };
 
-  const Card = ({ p }: { p: ProjectSummary }) => {
+  /** latest version per (kind, outfit) + its older versions */
+  const lines = (list: ProjectSummary[]) => {
+    const m = new Map<string, ProjectSummary[]>();
+    for (const p of list) {
+      const key = `${p.sprite!.kind}:${p.sprite!.outfit}`;
+      m.set(key, [...(m.get(key) ?? []), p]);
+    }
+    return [...m.values()].map((vs) => {
+      const sorted = vs.sort((a, b) => b.sprite!.version - a.sprite!.version || b.updatedAt - a.updatedAt);
+      return { latest: sorted[0], older: sorted.slice(1) };
+    });
+  };
+
+  const Card = ({ p, older = [] }: { p: ProjectSummary; older?: ProjectSummary[] }) => {
     const s = p.sprite!;
+    const open = historyOpen === p.id;
     return (
       <div className="project-card sprite-card">
         <div className="project-thumb checker" onClick={() => openById(p.id)}>
@@ -100,7 +139,24 @@ export function SpriteLibrary() {
             <button className="btn-ghost sm" onClick={() => router.push(`/forge?master=${encodeURIComponent(p.id)}`)}><Shirt size={13} /> Variant</button>
           )}
           <button className="icon-btn sm" title="Regenerate (giữ bản cũ)" onClick={() => router.push(`/forge?regen=${encodeURIComponent(p.id)}`)}><RefreshCw size={13} /></button>
+          {older.length > 0 && (
+            <button className={`chip-btn ${open ? "on" : ""}`} onClick={() => setHistoryOpen(open ? null : p.id)} title="Các phiên bản trước"><History size={12} /> {older.length}</button>
+          )}
         </div>
+        {open && (
+          <ul className="version-list">
+            {older.map((o) => (
+              <li key={o.id}>
+                <span className="chip">v{o.sprite!.version}</span>
+                <span className={`status-chip chip ${o.sprite!.status}`}>{STATUS_LABEL[o.sprite!.status]}</span>
+                <span className="muted small">{new Date(o.updatedAt).toLocaleDateString("vi-VN")}</span>
+                <div className="spacer" />
+                <button className="link-btn" onClick={() => openById(o.id)}>Mở</button>
+                <button className="link-btn" onClick={() => restore(o, s.version)} title="Tạo bản mới từ phiên bản này"><Undo2 size={11} /> Khôi phục</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
   };
@@ -155,8 +211,8 @@ export function SpriteLibrary() {
               <button className="btn-ghost sm" disabled={busy === g.characterId} onClick={() => exportGroup(g, false)}>Export tất cả</button>
             </div>
             <div className="project-grid">
-              {g.masters.map((p) => <Card key={p.id} p={p} />)}
-              {g.variants.map((p) => <Card key={p.id} p={p} />)}
+              {lines(g.masters).map((l) => <Card key={l.latest.id} p={l.latest} older={l.older} />)}
+              {lines(g.variants).map((l) => <Card key={l.latest.id} p={l.latest} older={l.older} />)}
             </div>
           </section>
         ))
