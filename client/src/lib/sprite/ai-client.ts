@@ -42,7 +42,7 @@ export interface AiGenerateResult {
 }
 
 export interface AiGenerateInput {
-  mode: "master" | "variant";
+  mode: "master" | "variant" | "animation";
   prompt: string;
   negativePrompt?: string;
   count: number;

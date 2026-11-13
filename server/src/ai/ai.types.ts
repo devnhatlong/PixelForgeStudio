@@ -6,7 +6,8 @@ export interface ImageInput {
 }
 
 export interface GenerateRequest {
-  mode: "master" | "variant";
+  /** animation = sprite sheet of one action for the reference character */
+  mode: "master" | "variant" | "animation";
   prompt: string;
   negativePrompt?: string;
   count: number;

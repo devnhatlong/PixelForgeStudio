@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Wand2, ImageUp, Sparkles, Save, AlertTriangle, Layers, Eye, EyeOff, RefreshCw, Crown, Shirt, X, Lock, Settings, ImagePlus, ScanEye, MessageSquare, Bot, Trash2, Grid3x3, Dna } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Wand2, ImageUp, Sparkles, Save, AlertTriangle, Layers, Eye, EyeOff, RefreshCw, Crown, Shirt, X, Lock, Settings, ImagePlus, ScanEye, MessageSquare, Bot, Trash2, Grid3x3, Dna, Film } from "lucide-react";
 import { AI_CHANGED_EVENT } from "./AiSettingsModal";
 import { STUDIO_PATH, useProjectActions } from "@/hooks/useProjectActions";
 import { useAppStore } from "@/store/app-store";
@@ -23,9 +23,10 @@ import { describeImage, generateImages, getAiInfo, type AiGenerateResult, type A
 import { AiAssistant } from "./AiAssistant";
 import { SheetSlicerModal } from "./SheetSlicerModal";
 import { DnaCompareCard } from "./Dna";
+import { ANIMATION_STATES } from "@/lib/sprite/anim-states";
 import { compareToMaster, dnaPrompt } from "@/lib/sprite/dna";
 import type { PixelDocument, ProjectSummary } from "@/types/editor";
-import type { CleanupConfig, GenerationInfo, PixelConfig, SpriteMeta, SpritePose, SpriteView } from "@/types/sprite";
+import type { CleanupConfig, GenerationInfo, PixelConfig, SpriteMeta, SpritePose, SpriteView, AnimationState } from "@/types/sprite";
 import { BgPicker, PixelPreview, RgbaPreview, ZoomPicker, type PreviewBg } from "./Previews";
 import { QualityList } from "./QualityList";
 import { MaskPainter, maskToRgba, type MaskData } from "./MaskPainter";
@@ -64,6 +65,59 @@ const VIEW_PROMPT: Record<SpriteView, string> = {
   back: "back view",
 };
 
+const ANIM_GRID: Record<4 | 6 | 8, [number, number]> = { 4: [2, 2], 6: [3, 2], 8: [4, 2] };
+const ANIM_PROMPT: Record<AnimationState, string> = {
+  idle: "idle breathing loop (subtle up-down body motion, hair and cloth sway)",
+  walk: "walk cycle loop (contact, down, passing, up poses)",
+  run: "run cycle loop (both feet off the ground in passing frames, leaning forward)",
+  jump: "jump (crouch, take-off, airborne, fall, landing)",
+  attack: "sword slash attack (wind-up, strike, follow-through, recover)",
+  hit: "hit reaction (flinch backwards, recover)",
+  death: "death (stagger, fall, lie on the ground)",
+  cast: "skill casting (gather energy, hands forward)",
+  release: "skill release (thrust forward, energy burst, recover)",
+  custom: "action",
+};
+const ANIM_HINT: Record<AnimationState, string> = {
+  idle: "Đứng thở, lặp", walk: "Đi bộ, lặp", run: "Chạy, lặp", jump: "Nhảy", attack: "Chém", hit: "Trúng đòn", death: "Gục ngã", cast: "Vận chiêu", release: "Tung chiêu", custom: "",
+};
+
+/** canvas aspect ratios offered next to the canvas size (w:h) */
+const ASPECTS: { id: string; w: number; h: number; label: string; hint: string }[] = [
+  { id: "free", w: 0, h: 0, label: "Tự do", hint: "Nhập rộng × cao tùy ý" },
+  { id: "2:3", w: 2, h: 3, label: "2:3", hint: "Nhân vật đứng (preset Huyền Ấn)" },
+  { id: "3:4", w: 3, h: 4, label: "3:4", hint: "Nhân vật thấp / chibi đậm" },
+  { id: "9:16", w: 9, h: 16, label: "9:16", hint: "Nhân vật cao, boss đứng" },
+  { id: "1:1", w: 1, h: 1, label: "1:1", hint: "Vuông — quái nhỏ, item, chân dung" },
+  { id: "4:3", w: 4, h: 3, label: "4:3", hint: "Quái to, thú cưỡi" },
+  { id: "3:2", w: 3, h: 2, label: "3:2", hint: "Ngang — vũ khí dài, thú" },
+  { id: "16:9", w: 16, h: 9, label: "16:9", hint: "Ngang rộng — rồng, xe, hiệu ứng skill" },
+];
+const SIZE_STEPS = [64, 96, 128, 160, 192, 256, 320, 384, 512];
+const clampPx = (n: number) => Math.max(16, Math.min(512, Math.round(n) || 16));
+function detectAspect(w: number, h: number): string {
+  return ASPECTS.find((a) => a.w && Math.abs(w / h - a.w / a.h) < 0.02)?.id ?? "free";
+}
+/** keep the height (character size), adjust the width; shrink both if the width would exceed 512 */
+function fitAspect(w: number, h: number, id: string): [number, number] {
+  const a = ASPECTS.find((x) => x.id === id);
+  if (!a || !a.w) return [w, h];
+  let W = Math.round((h * a.w) / a.h),
+    H = h;
+  if (W > 512) {
+    W = 512;
+    H = Math.round((512 * a.h) / a.w);
+  }
+  return [clampPx(W), clampPx(H)];
+}
+
+/** heuristic: several paragraphs or motion verbs → the user is describing an animation in the wrong mode */
+function looksLikeMotion(text: string): boolean {
+  const paragraphs = text.split(/\n\s*\n/).filter((x) => x.trim()).length;
+  const verbs = (text.match(/\b(walk(ing)?|run(ning)?|slash|jump|crouch|stagger|flinch|breathing|thrust|swing(s)?|recoil|fall(s)?|land)\b/gi) ?? []).length;
+  return paragraphs >= 3 || verbs >= 3;
+}
+
 const VARIANT_PREFIX =
   "Use the reference image as the same character. Keep exactly the same face, hairstyle, head size, body proportions, pose, camera angle, size and position on the canvas. Only change the clothing inside the editable (masked) area to:";
 
@@ -90,8 +144,10 @@ async function masterReference(master: PixelDocument): Promise<{ blob: Blob; rgb
 
 export function SpriteForge() {
   const params = useSearchParams();
+  const router = useRouter();
   const masterParam = params.get("master");
   const regenParam = params.get("regen");
+  const modeParam = params.get("mode");
   const notify = useAppStore((s) => s.notify);
   const openModal = useAppStore((s) => s.openModal);
   const user = useAuthStore((s) => s.user);
@@ -99,7 +155,13 @@ export function SpriteForge() {
   const { openDocument } = useProjectActions();
 
   // ---- setup
-  const [mode, setMode] = useState<"master" | "variant">(masterParam ? "variant" : "master");
+  const [mode, setMode] = useState<"master" | "variant" | "animation">(masterParam ? (modeParam === "animation" ? "animation" : "variant") : "master");
+  /** variant + animation both start from an approved master */
+  const usesMaster = mode !== "master";
+  // animation mode: one action of the master, generated as a sprite sheet then sliced
+  const [animState, setAnimState] = useState<AnimationState>("idle");
+  const [animFrames, setAnimFrames] = useState<4 | 6 | 8>(6);
+  const animGrid = ANIM_GRID[animFrames];
   const [masters, setMasters] = useState<ProjectSummary[]>([]);
   const [masterDoc, setMasterDoc] = useState<PixelDocument | null>(null);
   const [reference, setReference] = useState<{ blob: Blob; rgba: RgbaImage; fromSource: boolean } | null>(null);
@@ -108,17 +170,38 @@ export function SpriteForge() {
   /** art-style examples (≤3); assetId set once stored (reused from the master for variants) */
   const [styleRefs, setStyleRefs] = useState<{ key: string; blob: Blob; url: string; name: string; assetId?: string }[]>([]);
 
-  const [displayName, setDisplayName] = useState("Nam Kiếm Khách");
-  const [characterId, setCharacterId] = useState("HY_MALE_SWORD_001");
+  const [displayName, setDisplayName] = useState("");
+  const [characterId, setCharacterId] = useState("");
+  /** ID follows the name until the user edits the ID by hand */
+  const [idTouched, setIdTouched] = useState(false);
   const [outfit, setOutfit] = useState("BASE");
   const [presetId, setPresetId] = useState(DEFAULT_PRESET_ID);
   const basePreset = getPreset(presetId) ?? SPRITE_PRESETS[0];
   const [canvasW, setCanvasW] = useState(basePreset.canvas.width);
   const [canvasH, setCanvasH] = useState(basePreset.canvas.height);
+  const [aspect, setAspect] = useState(() => detectAspect(basePreset.canvas.width, basePreset.canvas.height));
+  const aspectDef = ASPECTS.find((a) => a.id === aspect)!;
+  /** width/height edits keep the chosen ratio */
+  const changeW = (v: number) => {
+    const w = clampPx(v);
+    setCanvasW(w);
+    if (aspectDef.w) setCanvasH(clampPx((w * aspectDef.h) / aspectDef.w));
+  };
+  const changeH = (v: number) => {
+    const h = clampPx(v);
+    setCanvasH(h);
+    if (aspectDef.w) setCanvasW(clampPx((h * aspectDef.w) / aspectDef.h));
+  };
+  const chooseAspect = (id: string) => {
+    setAspect(id);
+    const [w, h] = fitAspect(canvasW, canvasH, id);
+    setCanvasW(w);
+    setCanvasH(h);
+  };
   const preset = useMemo(() => withCanvas(basePreset, canvasW, canvasH), [basePreset, canvasW, canvasH]);
   const [view, setView] = useState<SpriteView>(basePreset.defaultView);
   const [pose, setPose] = useState<SpritePose>(basePreset.defaultPose);
-  const [prompt, setPrompt] = useState("young male swordsman, red and black wuxia robe, long black hair tied in a topknot, straight sword (jian) at his waist");
+  const [prompt, setPrompt] = useState("");
   const [negative, setNegative] = useState(basePreset.negativePrompt);
   const [count, setCount] = useState(2);
   const [seed, setSeed] = useState<string>("");
@@ -168,7 +251,7 @@ export function SpriteForge() {
     setReading(true);
     try {
       const { blob } = await shrinkToPng(file, 1024);
-      const r = await describeImage(blob, mode === "variant" ? "outfit" : "character");
+      const r = await describeImage(blob, mode === "variant" ? "outfit" : mode === "animation" ? "character" : "character");
       setPrompt(r.text);
       notify(r.mock ? "Mock: mô tả mẫu (bật OpenAI để đọc ảnh thật)" : "AI đã đọc ảnh và viết mô tả — kiểm tra / sửa lại trước khi Generate", r.mock ? "info" : "success");
     } catch (e) {
@@ -218,6 +301,7 @@ export function SpriteForge() {
       setPresetId(p.id);
       setCanvasW(d.width);
       setCanvasH(d.height);
+      setAspect(detectAspect(d.width, d.height));
       setView(d.sprite.view);
       setPose(d.sprite.pose);
       setScaleMode(d.sprite.normalize ? "match-master" : "fit-height");
@@ -265,13 +349,16 @@ export function SpriteForge() {
           setSelectedId(c.id);
         }
       } else if (masterParam) {
-        setMode("variant");
-        setOutfit("OUTFIT_A");
+        if (modeParam === "animation") setMode("animation");
+        else {
+          setMode("variant");
+          setOutfit("OUTFIT_A");
+        }
         await loadMaster(masterParam);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, masterParam, regenParam]);
+  }, [authReady, masterParam, regenParam, modeParam]);
 
   const masterPalette = useMemo(
     () => (masterDoc ? masterDoc.sprite?.lockedPalette ?? Array.from(new Set(flattenFrame(masterDoc).pixels.filter(Boolean))) : null),
@@ -354,9 +441,14 @@ export function SpriteForge() {
       : mode === "variant"
         ? `\nThe first input image is the character to keep. The other ${n} image(s) are ART STYLE examples only: match their drawing style (pixel density, outline, shading, palette feel), do not copy their characters or content.`
         : `\nThe ${n} input image(s) are ART STYLE examples only: draw a NEW character as described, matching their drawing style (pixel density, outline thickness, shading, color palette feel, proportions). Do not copy the characters, faces, clothing or content of the examples.`;
-    const dnaText = dnaPrompt(mode === "variant" ? masterDoc?.sprite?.dna : regenFrom?.sprite?.dna);
+    const dnaText = dnaPrompt(usesMaster ? masterDoc?.sprite?.dna : regenFrom?.sprite?.dna);
+    if (mode === "animation") {
+      const [c, r] = animGrid;
+      const extra = prompt.trim() ? ` Motion notes: ${prompt.trim()}.` : "";
+      return `Pixel art sprite sheet of a ${ANIM_PROMPT[animState]} animation for the EXACT same character as the reference image: same face, hair, outfit, colors, weapon and body proportions.${extra} ${animFrames} frames in a grid of ${c} columns and ${r} rows, read left-to-right then top-to-bottom, smooth consecutive motion. Every frame the same size, the character the same size in every frame, ${VIEW_PROMPT[view]}, feet on the same ground line in every cell, evenly spaced, generous empty space between frames, no overlapping. Plain solid white background, no text, no numbers, no grid lines, no borders.${dnaText}\nStyle: ${style}${styleNote}`;
+    }
     return mode === "variant" ? `${VARIANT_PREFIX} ${prompt.trim()}.${dnaText}\nStyle: ${style}${styleNote}` : `${core}.${dnaText}\nStyle: ${style}${styleNote}`;
-  }, [prompt, view, pose, mode, basePreset.stylePrompt, styleRefs.length, masterDoc?.sprite?.dna, regenFrom?.sprite?.dna]);
+  }, [prompt, view, pose, mode, basePreset.stylePrompt, styleRefs.length, masterDoc?.sprite?.dna, regenFrom?.sprite?.dna, animState, animFrames, animGrid]);
 
   const addStyleFiles = async (files: FileList | File[] | null) => {
     if (!files) return;
@@ -398,7 +490,7 @@ export function SpriteForge() {
   };
 
   const generate = async () => {
-    if (mode === "variant" && !reference) return notify("Chọn master trước khi tạo variant", "error");
+    if (usesMaster && !reference) return notify(mode === "animation" ? "Chọn master trước khi tạo animation" : "Chọn master trước khi tạo variant", "error");
     setBusy(true);
     setAiError(null);
     const ctrl = new AbortController();
@@ -411,12 +503,12 @@ export function SpriteForge() {
           prompt: finalPrompt,
           negativePrompt: negative,
           count,
-          width: preset.canvas.width,
-          height: preset.canvas.height,
+          width: mode === "animation" ? preset.canvas.width * animGrid[0] : preset.canvas.width,
+          height: mode === "animation" ? preset.canvas.height * animGrid[1] : preset.canvas.height,
           seed: seed.trim() ? Number(seed) : null,
           model: effectiveGenModel,
           quality: effectiveGenQuality,
-          reference: mode === "variant" ? reference?.blob : null,
+          reference: usesMaster ? reference?.blob : null,
           mask: maskBlob,
           styleRefs: styleRefs.map((s) => s.blob),
         },
@@ -429,6 +521,7 @@ export function SpriteForge() {
         list.push({ id: c.id, blob, rgba: await blobToRgba(blob), url: URL.createObjectURL(blob), seed: c.seed, origin: "ai" });
       }
       addCandidates(list);
+      if (mode === "animation" && list[0]) setSlicerFor(list[0]);
       setAiInfo((i) => (i ? { ...i, usage: res.usage } : i));
       notify(`Đã tạo ${list.length} phương án${res.estimatedCostUsd ? ` (~$${res.estimatedCostUsd})` : ""}`, "success");
     } catch (e) {
@@ -457,7 +550,7 @@ export function SpriteForge() {
   };
 
   const save = async () => {
-    if (!selected || !result || !result.bbox) return;
+    if (!selected || !result || !result.bbox || mode === "animation") return; // animations are saved from the sheet slicer
     const errors = quality?.issues.filter((i) => i.level === "error") ?? [];
     if (errors.length && !confirm(`Còn ${errors.length} lỗi:\n- ${errors.map((e) => e.message).join("\n- ")}\n\nVẫn lưu dưới dạng Draft?`)) return;
     setSaving(true);
@@ -489,7 +582,7 @@ export function SpriteForge() {
         createdAt: Date.now(),
       };
       const outfitId = sanitizeId(outfit) || (mode === "master" ? "BASE" : "OUTFIT");
-      const charId = sanitizeId(characterId) || "CHARACTER";
+      const charId = sanitizeId(characterId) || sanitizeId(displayName) || `CHAR_${Date.now().toString(36).toUpperCase()}`;
       const name = `${displayName.trim() || charId} - ${outfitId}${regenFrom ? ` v${(regenFrom.sprite?.version ?? 1) + 1}` : ""}`;
       const doc = createDocument(name, W, H);
       doc.layers[0].name = "Sprite";
@@ -540,7 +633,7 @@ export function SpriteForge() {
   const effectiveGenModel = imageModels.some((m) => m.id === genModel) ? genModel : aiInfo?.model ?? null;
   const effectiveGenQuality = aiInfo?.qualities?.includes(genQuality) ? genQuality : aiInfo?.defaultQuality ?? null;
   const maskRisk = mode === "variant" && !!mask && !!effectiveGenModel && /gpt-image-2\.6/.test(effectiveGenModel);
-  const providerNoRef = aiInfo && mode === "variant" && !aiInfo.capabilities.reference;
+  const providerNoRef = aiInfo && usesMaster && !aiInfo.capabilities.reference;
   const needLogin = aiInfo?.requiresAuth && !user;
 
   return (
@@ -584,10 +677,14 @@ export function SpriteForge() {
               <span className="mode-icon"><Shirt size={16} /></span>
               <span className="mode-texts"><strong>Variant</strong><span>Đổi trang phục từ master</span></span>
             </button>
+            <button className={`mode-card ${mode === "animation" ? "active" : ""}`} onClick={() => setMode("animation")}>
+              <span className="mode-icon"><Film size={16} /></span>
+              <span className="mode-texts"><strong>Animation</strong><span>Động tác từ master</span></span>
+            </button>
           </div>
           {regenFrom && <p className="note">Regenerate từ <b>{regenFrom.name}</b> (v{regenFrom.sprite?.version}). Bản cũ được giữ nguyên; sẽ lưu thành v{(regenFrom.sprite?.version ?? 1) + 1}.</p>}
 
-          {mode === "variant" && (
+          {usesMaster && (
             <>
               <label className="field-label">Master</label>
               <Select
@@ -605,10 +702,22 @@ export function SpriteForge() {
               {masterDoc && (masterDoc.sprite?.dna?.traits ? (
                 <p className="note dna-note" title={masterDoc.sprite.dna.traits}><Dna size={13} /> DNA được chèn vào prompt: <span className="clamp">{masterDoc.sprite.dna.traits}</span></p>
               ) : (
-                <p className="note warn"><AlertTriangle size={13} /> Master chưa có Character DNA — mở master → Review → "AI đọc DNA" để khóa nhận diện tốt hơn.</p>
+                <></>
               ))}
-              {masterDoc && masterDoc.sprite?.status !== "approved" && <p className="note warn"><AlertTriangle size={13} /> Master chưa Approved - nên duyệt master trước khi làm variant.</p>}
-              {reference && (
+              {masterDoc && (!masterDoc.sprite?.dna?.traits || masterDoc.sprite?.status !== "approved") && (
+                <div className="note warn master-todo">
+                  <AlertTriangle size={13} />
+                  <div>
+                    <b>Nên hoàn tất master trước</b> (không bắt buộc — vẫn Generate được):
+                    <ul>
+                      {!masterDoc.sprite?.dna?.traits && <li>Chưa có <b>Character DNA</b> — giúp AI giữ đúng mặt, tóc, màu ở mọi {mode === "animation" ? "động tác" : "trang phục"}.</li>}
+                      {masterDoc.sprite?.status !== "approved" && <li>Chưa <b>Approved</b> — duyệt để khóa bảng màu chuẩn và số liệu DNA.</li>}
+                    </ul>
+                    <button className="link-btn" onClick={() => router.push(`/studio/${encodeURIComponent(masterDoc.id)}`)}>Mở master → bấm chip &quot;Master · Draft&quot; để làm</button>
+                  </div>
+                </div>
+              )}
+              {mode === "variant" && reference && (
                 <>
                   <label className="field-label">Mask vùng được đổi (tùy chọn, khuyến nghị)</label>
                   {!reference.fromSource && <p className="muted small">Master không có ảnh nguồn - dùng ảnh phóng to từ pixel làm tham chiếu.</p>}
@@ -618,54 +727,104 @@ export function SpriteForge() {
             </>
           )}
 
+          {mode === "animation" && (
+            <div className="anim-setup">
+              <div className="grid2">
+                <div>
+                  <label className="field-label">Động tác</label>
+                  <Select<AnimationState>
+                    value={animState}
+                    onChange={setAnimState}
+                    options={ANIMATION_STATES.filter((x) => x.value !== "custom").map((x) => ({ value: x.value, label: x.label, hint: ANIM_HINT[x.value] }))}
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Số frame</label>
+                  <div className="seg wide count-seg">
+                    {([4, 6, 8] as const).map((n) => <button key={n} className={animFrames === n ? "active" : ""} onClick={() => setAnimFrames(n)}>{n}</button>)}
+                  </div>
+                </div>
+              </div>
+              <p className="muted small">AI vẽ 1 sprite sheet {animGrid[0]} cột × {animGrid[1]} hàng của chính nhân vật master. Sau đó tool tự mở <b>Cắt grid</b> để ghép thành animation. Nên Generate 1–2 phương án rồi chọn sheet đều nhất.</p>
+            </div>
+          )}
+
           <div className="grid2">
             <div>
               <label className="field-label">Tên nhân vật</label>
-              <input className="text-input" value={displayName} disabled={mode === "variant" && !!masterDoc} onChange={(e) => { setDisplayName(e.target.value); }} />
+              <input className="text-input" value={displayName} placeholder="vd: Nam Kiếm Khách" disabled={usesMaster && !!masterDoc} onChange={(e) => { setDisplayName(e.target.value); if (!idTouched) setCharacterId(sanitizeId(e.target.value)); }} />
             </div>
             <div>
               <label className="field-label">Character ID</label>
-              <input className="text-input" value={characterId} disabled={mode === "variant" && !!masterDoc} onChange={(e) => setCharacterId(e.target.value)} onBlur={(e) => setCharacterId(sanitizeId(e.target.value))} />
+              <input className="text-input" value={characterId} placeholder="tự sinh theo tên" disabled={usesMaster && !!masterDoc} onChange={(e) => { setCharacterId(e.target.value); setIdTouched(e.target.value.trim() !== ""); }} onBlur={(e) => setCharacterId(sanitizeId(e.target.value))} />
             </div>
           </div>
-          <label className="field-label">Outfit ID</label>
-          <input className="text-input" value={outfit} onChange={(e) => setOutfit(e.target.value)} onBlur={(e) => setOutfit(sanitizeId(e.target.value))} />
+          {mode !== "animation" && (
+            <>
+              <label className="field-label">Outfit ID</label>
+              <input className="text-input" value={outfit} onChange={(e) => setOutfit(e.target.value)} onBlur={(e) => setOutfit(sanitizeId(e.target.value))} />
+            </>
+          )}
 
           <div className="grid2">
             <div>
               <label className="field-label">Style preset</label>
               <Select
                 value={presetId}
-                disabled={mode === "variant" && !!masterDoc}
+                disabled={usesMaster && !!masterDoc}
                 options={SPRITE_PRESETS.map((p) => ({ value: p.id, label: `${p.id.replace(/_/g, " ")} · v${p.version}`, hint: p.name }))}
-                onChange={(id) => { const p = getPreset(id)!; setPresetId(p.id); setCanvasW(p.canvas.width); setCanvasH(p.canvas.height); }}
+                onChange={(id) => { const p = getPreset(id)!; setPresetId(p.id); setCanvasW(p.canvas.width); setCanvasH(p.canvas.height); setAspect(detectAspect(p.canvas.width, p.canvas.height)); }}
               />
             </div>
             <div>
               <label className="field-label">Canvas</label>
-              <div className={`size-field ${mode === "variant" && masterDoc ? "disabled" : ""}`}>
-                <input type="number" min={16} max={512} value={canvasW} aria-label="Rộng" disabled={mode === "variant" && !!masterDoc} onChange={(e) => setCanvasW(Math.max(16, Math.min(512, Number(e.target.value) || 16)))} />
+              <div className={`size-field ${usesMaster && masterDoc ? "disabled" : ""}`}>
+                <input type="number" min={16} max={512} value={canvasW} aria-label="Rộng" disabled={usesMaster && !!masterDoc} onChange={(e) => changeW(Number(e.target.value))} />
                 <X size={12} className="muted" />
-                <input type="number" min={16} max={512} value={canvasH} aria-label="Cao" disabled={mode === "variant" && !!masterDoc} onChange={(e) => setCanvasH(Math.max(16, Math.min(512, Number(e.target.value) || 16)))} />
+                <input type="number" min={16} max={512} value={canvasH} aria-label="Cao" disabled={usesMaster && !!masterDoc} onChange={(e) => changeH(Number(e.target.value))} />
                 <span className="unit">px</span>
               </div>
+            </div>
+          </div>
+          <div className="grid2">
+            <div>
+              <label className="field-label" title="Tỉ lệ rộng : cao của khung sprite. Sửa rộng thì cao tự đổi theo (và ngược lại).">Tỉ lệ khung</label>
+              <Select
+                value={aspect}
+                disabled={usesMaster && !!masterDoc}
+                onChange={chooseAspect}
+                options={ASPECTS.map((a) => ({ value: a.id, label: a.label, hint: a.hint }))}
+              />
+            </div>
+            <div>
+              <label className="field-label" title="Các cỡ có sẵn theo tỉ lệ đang chọn">Cỡ nhanh</label>
+              <Select
+                value={`${canvasW}x${canvasH}`}
+                disabled={usesMaster && !!masterDoc}
+                placeholder={`${canvasW}×${canvasH}`}
+                onChange={(v) => { const [w, h] = v.split("x").map(Number); setCanvasW(w); setCanvasH(h); }}
+                options={SIZE_STEPS.map((hh) => {
+                  const [w, h] = aspectDef.w ? fitAspect(canvasW, hh, aspect) : [Math.round((canvasW / canvasH) * hh), hh];
+                  return { value: `${clampPx(w)}x${clampPx(h)}`, label: `${clampPx(w)} × ${clampPx(h)}`, hint: hh <= 96 ? "Nhỏ — NPC, quái thường" : hh <= 192 ? "Vừa — nhân vật chính" : "Lớn — boss, cutscene" };
+                }).filter((o, i, arr) => arr.findIndex((x) => x.value === o.value) === i)}
+              />
             </div>
           </div>
           <div className="preset-facts">
             <span>Chân <b>{preset.footAnchor.x},{preset.footAnchor.y}</b></span>
             <span>Cao <b>{preset.contentHeight}px</b></span>
             <span>Tối đa <b>{basePreset.maxColors}</b> màu</span>
-            {mode === "variant" && masterDoc && <span title="Variant dùng cùng preset, canvas, góc nhìn và pose với master"><Lock size={11} /> theo master</span>}
+            {usesMaster && masterDoc && <span title="Variant / animation dùng cùng preset, canvas, góc nhìn và pose với master"><Lock size={11} /> theo master</span>}
           </div>
 
           <div className="grid2">
             <div>
               <label className="field-label">Góc nhìn</label>
-              <Select value={view} disabled={mode === "variant"} options={VIEWS.map((v) => ({ value: v.id, label: v.label }))} onChange={setView} />
+              <Select value={view} disabled={usesMaster} options={VIEWS.map((v) => ({ value: v.id, label: v.label }))} onChange={setView} />
             </div>
             <div>
               <label className="field-label">Pose</label>
-              <Select value={pose} disabled={mode === "variant"} options={POSES.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))} onChange={setPose} />
+              <Select value={pose} disabled={usesMaster} options={POSES.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))} onChange={setPose} />
             </div>
           </div>
 
@@ -703,7 +862,7 @@ export function SpriteForge() {
           )}
 
           <div className="label-row">
-            <label className="field-label" title="Viết bằng tiếng Anh cho kết quả tốt hơn">{mode === "variant" ? "Mô tả trang phục mới" : "Mô tả nhân vật"}</label>
+            <label className="field-label" title="Viết bằng tiếng Anh cho kết quả tốt hơn">{mode === "variant" ? "Mô tả trang phục mới" : mode === "animation" ? "Ghi chú động tác (tùy chọn)" : "Mô tả nhân vật"}</label>
             <div className="label-actions">
               <label className={`chip-btn ${reading ? "busy" : ""}`} title={mode === "variant" ? "Tải hình trang phục bạn thích — AI viết mô tả trang phục" : "Tải hình nhân vật / concept — AI xem và viết mô tả"}>
                 {reading ? <Spinner size={12} /> : <ScanEye size={13} />} Đọc ảnh
@@ -718,7 +877,7 @@ export function SpriteForge() {
             className="text-input"
             rows={4}
             value={prompt}
-            placeholder={mode === "variant" ? "vd: white and blue scholar robe with silver belt" : "vd: young male swordsman, red and black wuxia robe, long black hair in a topknot"}
+            placeholder={mode === "variant" ? "vd: white and blue scholar robe with silver belt" : mode === "animation" ? "vd: sword held low, robe and hair sway gently, slow breathing" : "vd: young male swordsman, red and black wuxia robe, long black hair in a topknot"}
             onChange={(e) => setPrompt(e.target.value)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -730,6 +889,12 @@ export function SpriteForge() {
               }
             }}
           />
+          {mode !== "animation" && looksLikeMotion(prompt) && (
+            <p className="note warn">
+              <AlertTriangle size={13} /> Ô này có vẻ đang tả <b>động tác</b>. Chế độ {mode === "master" ? "Master" : "Variant"} chỉ vẽ 1 hình đứng — để ra bộ frame hãy dùng thẻ Animation, mỗi lần 1 động tác.
+              <button className="link-btn" onClick={() => setMode("animation")}>Chuyển sang Animation</button>
+            </p>
+          )}
           <details className="small">
             <summary className="muted">Prompt cuối cùng gửi provider / negative prompt</summary>
             <pre className="prompt-pre">{finalPrompt}</pre>
@@ -739,7 +904,7 @@ export function SpriteForge() {
 
           <div className="grid2">
             <div>
-              <label className="field-label">Số phương án</label>
+              <label className="field-label" title="Số bản AI vẽ để bạn chọn 1 bản đẹp nhất — mỗi bản tính tiền riêng. Không phải số frame.">{mode === "animation" ? "Số sheet để chọn" : "Số bản để chọn"}</label>
               <div className="seg wide count-seg">
                 {Array.from({ length: aiInfo?.limits.maxCount ?? 4 }, (_, i) => i + 1).map((n) => (
                   <button key={n} className={count === n ? "active" : ""} onClick={() => setCount(n)}>{n}</button>
@@ -749,9 +914,9 @@ export function SpriteForge() {
             <div>
               <label className="field-label" title="Cùng seed + cùng prompt → cùng kết quả (nếu provider hỗ trợ)">Seed</label>
               {aiInfo && !aiInfo.capabilities.seed ? (
-                <input className="text-input" disabled placeholder="Model không hỗ trợ" title="OpenAI không nhận seed — mỗi lần Generate cho kết quả khác" />
+                <input key="seed-off" className="text-input" value="" readOnly disabled placeholder="Model không hỗ trợ" title="OpenAI không nhận seed — mỗi lần Generate cho kết quả khác" />
               ) : (
-                <input className="text-input" value={seed} placeholder="Ngẫu nhiên" inputMode="numeric" onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))} />
+                <input key="seed-on" className="text-input" value={seed} placeholder="Ngẫu nhiên" inputMode="numeric" onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))} />
               )}
             </div>
           </div>
@@ -795,13 +960,13 @@ export function SpriteForge() {
             {busy ? (
               <button className="gen-btn busy" onClick={() => abortRef.current?.abort()}>
                 <Spinner size={16} />
-                <span className="gen-texts"><strong>Đang tạo {count} phương án…</strong><span>Bấm để hủy</span></span>
+                <span className="gen-texts"><strong>{mode === "animation" ? `Đang vẽ ${count} sheet × ${animFrames} frame…` : `Đang tạo ${count} bản…`}</strong><span>Bấm để hủy</span></span>
               </button>
             ) : (
-              <button className="gen-btn" disabled={!aiInfo || !aiInfo.configured || !!needLogin || (mode === "variant" && !reference)} onClick={generate}>
+              <button className="gen-btn" disabled={!aiInfo || !aiInfo.configured || !!needLogin || (usesMaster && !reference)} onClick={generate}>
                 <Sparkles size={18} />
                 <span className="gen-texts">
-                  <strong>Generate {count} phương án</strong>
+                  <strong>{mode === "animation" ? `Generate ${count} sheet × ${animFrames} frame` : `Generate ${count} bản để chọn`}</strong>
                   <span>
                     {aiInfo
                       ? `${aiInfo.provider === "mock" ? "Mock - miễn phí" : `${effectiveGenModel ?? aiInfo.model}${effectiveGenQuality ? ` · ${effectiveGenQuality}` : ""}`}${aiInfo.limits.costPerImageUsd ? ` · ước tính ~$${(count * aiInfo.limits.costPerImageUsd).toFixed(2)}` : ""}`
@@ -844,7 +1009,7 @@ export function SpriteForge() {
             )}
           </h3>
           {gen && gen.warnings.length > 0 && <ul className="note warn list">{gen.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
-          {gen && mode === "variant" && <p className="muted small">Reference: {gen.referenceUsed ? "đã dùng" : "KHÔNG dùng"} · Mask: {gen.maskUsed ? "đã dùng" : "không"} · Model: {gen.model}</p>}
+          {gen && usesMaster && <p className="muted small">Reference: {gen.referenceUsed ? "đã dùng" : "KHÔNG dùng"} · Mask: {gen.maskUsed ? "đã dùng" : "không"} · Model: {gen.model}</p>}
           {candidates.length === 0 ? (
             <div className="empty small">Chưa có phương án. Bấm Generate hoặc Nhập ảnh.</div>
           ) : (
@@ -880,6 +1045,11 @@ export function SpriteForge() {
             </div>
           )}
 
+          {selected && mode === "animation" && (
+            <button className="btn-primary big anim-cut-btn" onClick={() => setSlicerFor(selected)}>
+              <Film size={15} /> Cắt sheet & tạo animation {ANIMATION_STATES.find((x) => x.value === animState)?.label}
+            </button>
+          )}
           {selected && (
             <>
               <div className="toolbar-row">
@@ -934,7 +1104,19 @@ export function SpriteForge() {
         {/* ---------------- 3. pixel + review ---------------- */}
         <section className="forge-col review">
           <h3>3. Normalize, pixel hóa & kiểm tra {processing && <Spinner size={13} />}</h3>
-          {!selected || !result ? (
+          {mode === "animation" ? (
+            <div className="anim-hint">
+              <Film size={28} />
+              <strong>Chế độ Animation</strong>
+              <ol>
+                <li>Chọn <b>master</b>, <b>động tác</b> và <b>số frame</b> ở cột 1.</li>
+                <li>Bấm <b>Generate</b> — AI vẽ một sprite sheet của chính nhân vật đó.</li>
+                <li>Hộp <b>Cắt sprite sheet</b> tự mở: kiểm tra từng ô, xem thử, chỉnh FPS.</li>
+                <li>Bấm <b>Tạo animation & mở Editor</b> → Timeline có sẵn nhãn trạng thái; dùng <b>Căn chân</b>, <b>Ghost Master</b>, <b>Xem trong game</b> để sửa.</li>
+              </ol>
+              <p className="muted small">AI không vẽ các frame giống nhau tuyệt đối — luôn duyệt bằng mắt và sửa pixel trong Editor.</p>
+            </div>
+          ) : !selected || !result ? (
             <div className="empty small">Chọn một phương án để xem kết quả.</div>
           ) : (
             <>
@@ -1049,6 +1231,8 @@ export function SpriteForge() {
           alphaThreshold={pixel.alphaThreshold}
           resizeMethod={pixel.resizeMethod}
           palette={effectivePalette ?? (snapPalette ? snapPalette.colors : null)}
+          initial={mode === "animation" ? { state: animState, frames: animFrames, cols: animGrid[0], rows: animGrid[1] } : undefined}
+          masterRef={usesMaster ? masterDoc?.id ?? null : null}
           onClose={() => setSlicerFor(null)}
           onAddCandidates={async (cells) => {
             const list: Candidate[] = [];

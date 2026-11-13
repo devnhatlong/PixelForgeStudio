@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Download, Eye, EyeOff, RefreshCw, Shirt, FileImage } from "lucide-react";
+import { BadgeCheck, Download, Eye, EyeOff, RefreshCw, Shirt, FileImage, Film } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Loading";
 import { useEditorStore } from "@/store/editor-store";
@@ -26,7 +26,7 @@ export function SpriteReviewModal({ onClose }: { onClose: () => void }) {
   const notify = useAppStore((s) => s.notify);
   const router = useRouter();
   const [master, setMaster] = useState<PixelDocument | null>(null);
-  const [zoom, setZoom] = useState(2);
+  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth >= 1400 ? 3 : 2));
   const [bg, setBg] = useState<PreviewBg>("checker");
   const [overlayOn, setOverlayOn] = useState(true);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
@@ -120,7 +120,7 @@ export function SpriteReviewModal({ onClose }: { onClose: () => void }) {
 
   const g = sprite.generation;
   return (
-    <Modal title="Review & Approve sprite" subtitle={`${sprite.kind === "master" ? "Master" : "Variant"} · ${sprite.characterId} · ${sprite.outfit} · v${sprite.version}`} icon={BadgeCheck} onClose={onClose} width={980}>
+    <Modal title="Review & Approve sprite" subtitle={`${sprite.kind === "master" ? "Master" : "Variant"} · ${sprite.characterId} · ${sprite.outfit} · v${sprite.version}`} icon={BadgeCheck} onClose={onClose} width="min(1440px, calc(100vw - 32px))" className="modal-review">
       <div className="review-body">
         <div className="review-preview">
           <div className="toolbar-row">
@@ -215,6 +215,9 @@ export function SpriteReviewModal({ onClose }: { onClose: () => void }) {
             <button className="btn-ghost" onClick={exportPngOnly}><FileImage size={14} /> Tải PNG & JSON rời</button>
             {sprite.kind === "master" && (
               <button className="btn-ghost" onClick={() => { onClose(); router.push(`/forge?master=${encodeURIComponent(doc.id)}`); }}><Shirt size={14} /> Tạo variant</button>
+            )}
+            {sprite.kind === "master" && (
+              <button className="btn-ghost" onClick={() => { onClose(); router.push(`/forge?master=${encodeURIComponent(doc.id)}&mode=animation`); }}><Film size={14} /> Tạo animation</button>
             )}
             <button className="btn-ghost" title="Tạo phiên bản mới; bản hiện tại (kể cả đã duyệt) được giữ nguyên" onClick={() => { onClose(); router.push(`/forge?regen=${encodeURIComponent(doc.id)}`); }}><RefreshCw size={14} /> Regenerate (v{sprite.version + 1})</button>
           </div>

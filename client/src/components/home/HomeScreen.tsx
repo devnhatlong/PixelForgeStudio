@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  User, FilePlus2, FolderOpen, ImageDown, Home, Store, Trash2, LayoutGrid, List, ArrowDown, ArrowUp,
-  RefreshCw, RotateCcw, X, FolderInput, Wand2, Swords, Bot, type LucideIcon,
-} from "lucide-react";
+import { User, FilePlus2, FolderOpen, ImageDown, Home, Store, Trash2, LayoutGrid, List, ArrowDown, ArrowUp, RefreshCw, RotateCcw, X, FolderInput, Wand2, Swords, Bot, Film, type LucideIcon } from "lucide-react";
 import { useAppStore, type HomeView } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -334,6 +331,9 @@ function RecentView() {
           actions={(p) => (
             <>
               <button className="btn-ghost sm" onClick={() => openById(p.id)}><FolderInput size={13} /> Mở</button>
+              {p.sprite?.kind === "master" && (
+                <button className="btn-ghost sm" title="Tạo động tác (Idle, Run, Attack…) từ master này" onClick={() => router.push(`/forge?master=${encodeURIComponent(p.id)}&mode=animation`)}><Film size={13} /> Animation</button>
+              )}
               <select
                 className="select sm"
                 title="Chuyển vào thư mục"

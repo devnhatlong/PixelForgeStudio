@@ -198,6 +198,46 @@ export function dominantHue(png: Buffer): number | null {
   return max > 0 ? bins.indexOf(max) * 10 + 5 : null;
 }
 
+/**
+ * Mock animation sheet: the reference tiled on a grid (cols×rows from the aspect: 3×2 landscape),
+ * each frame bobbing 0..3% of its height so the slicer + animation preview have motion to show.
+ */
+export function mockSheet(reference: Buffer, aspect: { width: number; height: number }, seed: number): Buffer {
+  let ref: PNG;
+  try {
+    ref = PNG.sync.read(reference);
+  } catch {
+    throw new ProviderError("Mock provider chỉ đọc được ảnh tham chiếu PNG", 400, false);
+  }
+  const cols = aspect.width >= aspect.height ? 3 : 2;
+  const rows = aspect.width >= aspect.height ? 2 : 3;
+  const cellW = 256,
+    cellH = Math.round((cellW * ref.height) / ref.width);
+  const out = new PNG({ width: cols * cellW, height: rows * cellH });
+  out.data.fill(255);
+  const sx = ref.width / (cellW * 0.8);
+  for (let f = 0; f < cols * rows; f++) {
+    const ox = (f % cols) * cellW + Math.round(cellW * 0.1);
+    const bob = Math.round(Math.abs(Math.sin((f + seed) * 0.9)) * cellH * 0.03);
+    const oy = Math.floor(f / cols) * cellH + Math.round(cellH * 0.08) - bob;
+    for (let y = 0; y < Math.round(cellH * 0.86); y++)
+      for (let x = 0; x < Math.round(cellW * 0.8); x++) {
+        const rx = Math.min(ref.width - 1, Math.floor(x * sx)),
+          ry = Math.min(ref.height - 1, Math.floor(y * sx));
+        const si = (ry * ref.width + rx) * 4;
+        const tx = ox + x,
+          ty = oy + y;
+        if (tx < 0 || ty < 0 || tx >= out.width || ty >= out.height) continue;
+        const di = (ty * out.width + tx) * 4;
+        out.data[di] = ref.data[si];
+        out.data[di + 1] = ref.data[si + 1];
+        out.data[di + 2] = ref.data[si + 2];
+        out.data[di + 3] = 255;
+      }
+  }
+  return PNG.sync.write(out);
+}
+
 export class MockProvider implements ImageProvider {
   readonly id = "mock";
   readonly model = "mock-procedural-v1";
@@ -215,7 +255,9 @@ export class MockProvider implements ImageProvider {
     for (let k = 0; k < req.count; k++) {
       const seed = base + k;
       const buffer =
-        req.mode === "variant" && req.reference
+        req.mode === "animation" && req.reference
+          ? mockSheet(req.reference.buffer, req.aspect, seed)
+          : req.mode === "variant" && req.reference
           ? recolorVariant(req.reference.buffer, req.mask?.buffer ?? null, seed)
           : drawMockCharacter(seed, 512, 768, styleHue);
       images.push({ buffer, mime: "image/png", seed });

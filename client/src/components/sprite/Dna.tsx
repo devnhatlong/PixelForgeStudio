@@ -87,6 +87,8 @@ export function DnaEditor({ dna, getImage, onSave }: { dna: CharacterDna | null 
       <div className="row-actions">
         <button className="btn-ghost sm" disabled={reading} onClick={read}>{reading ? <Spinner size={12} /> : <ScanEye size={13} />} AI đọc DNA từ master</button>
         <button className="btn-primary sm" disabled={!dirty} onClick={() => onSave(traits.trim(), notes.trim())}><Save size={13} /> Lưu DNA</button>
+        {!dirty && dna?.traits && <span className="dna-saved">✓ Đã lưu {new Date(dna.updatedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>}
+        {dirty && <span className="muted small">Chưa lưu thay đổi</span>}
       </div>
     </div>
   );

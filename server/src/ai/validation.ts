@@ -28,7 +28,7 @@ export interface GenerateBody {
 }
 
 export interface ValidatedGenerate {
-  mode: "master" | "variant";
+  mode: "master" | "variant" | "animation";
   prompt: string;
   negativePrompt: string;
   count: number;
@@ -68,7 +68,7 @@ export function validateGenerate(
     const err = validateFile(f, `Ảnh mẫu phong cách ${i + 1}`, limits.maxBytes);
     if (err) return { ok: false, error: err };
   }
-  const mode = body.mode === "variant" ? "variant" : body.mode === "master" || body.mode === undefined ? "master" : null;
+  const mode = body.mode === "variant" || body.mode === "animation" ? body.mode : body.mode === "master" || body.mode === undefined ? "master" : null;
   if (!mode) return { ok: false, error: "mode phải là master hoặc variant" };
   const prompt = String(body.prompt ?? "").trim();
   if (prompt.length < 3) return { ok: false, error: "Mô tả (prompt) quá ngắn" };
@@ -87,6 +87,8 @@ export function validateGenerate(
     if (err) return { ok: false, error: err };
   }
   if (mode === "variant" && !files.reference) return { ok: false, error: "Chế độ Variant bắt buộc gửi ảnh master làm tham chiếu" };
+  if (mode === "animation" && !files.reference) return { ok: false, error: "Chế độ Animation bắt buộc gửi ảnh master làm tham chiếu" };
+  if (mode === "animation" && files.mask) return { ok: false, error: "Chế độ Animation không dùng mask" };
   if (files.mask && !files.reference) return { ok: false, error: "Mask cần đi kèm ảnh tham chiếu" };
   if (files.mask && files.mask.mimetype !== "image/png") return { ok: false, error: "Mask phải là PNG" };
 

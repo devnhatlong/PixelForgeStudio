@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Download, FolderInput, RefreshCw, Shirt, Wand2, History, Undo2 } from "lucide-react";
+import { Crown, Download, FolderInput, RefreshCw, Shirt, Wand2, History, Undo2, Film } from "lucide-react";
 import { listProjects } from "@/lib/storage";
 import { ensureLocalDocument } from "@/lib/sync";
 import { downloadBlob } from "@/lib/pforge";
@@ -137,6 +137,9 @@ export function SpriteLibrary() {
           <button className="btn-ghost sm" onClick={() => openById(p.id)}><FolderInput size={13} /> Mở</button>
           {s.kind === "master" && (
             <button className="btn-ghost sm" onClick={() => router.push(`/forge?master=${encodeURIComponent(p.id)}`)}><Shirt size={13} /> Variant</button>
+          )}
+          {s.kind === "master" && (
+            <button className="btn-ghost sm" title="Tạo động tác (Idle, Run, Attack…) từ master này" onClick={() => router.push(`/forge?master=${encodeURIComponent(p.id)}&mode=animation`)}><Film size={13} /> Animation</button>
           )}
           <button className="icon-btn sm" title="Regenerate (giữ bản cũ)" onClick={() => router.push(`/forge?regen=${encodeURIComponent(p.id)}`)}><RefreshCw size={13} /></button>
           {older.length > 0 && (

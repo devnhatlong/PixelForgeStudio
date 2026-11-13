@@ -16,7 +16,7 @@ import { BgPicker, PixelPreview, type PreviewBg } from "./Previews";
 import { ANIMATION_STATES } from "@/lib/sprite/anim-states";
 
 /** max upscale of small sheets in the view */
-const MAX_VIEW_SCALE = 3;
+const MAX_VIEW_SCALE = 2;
 
 export interface SlicedCell {
   rgba: RgbaImage;
@@ -35,6 +35,8 @@ export function SheetSlicerModal({
   onClose,
   onAddCandidates,
   onCreateAnimation,
+  initial,
+  masterRef = null,
 }: {
   image: RgbaImage;
   name: string;
@@ -47,12 +49,16 @@ export function SheetSlicerModal({
   onClose: () => void;
   onAddCandidates: (cells: SlicedCell[]) => void;
   onCreateAnimation: (doc: PixelDocument) => void;
+  /** presets from Sprite Forge's Animation mode */
+  initial?: { state: AnimationState; frames: number; cols: number; rows: number };
+  /** master document the animation belongs to (ghost / DNA reference in the editor) */
+  masterRef?: string | null;
 }) {
   const [method, setMethod] = useState<"auto" | "grid" | "manual">("auto");
   const [manualRects, setManualRects] = useState<Rect[]>([]);
   const [draft, setDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const [clipState, setClipState] = useState<AnimationState>("idle");
-  const [clipName, setClipName] = useState("Idle");
+  const [clipState, setClipState] = useState<AnimationState>(initial?.state ?? "idle");
+  const [clipName, setClipName] = useState(ANIMATION_STATES.find((x) => x.value === (initial?.state ?? "idle"))?.label ?? "Idle");
   const [grid, setGrid] = useState<GridSpec>({ rows: 2, cols: 4, marginX: 0, marginY: 0, gapX: 0, gapY: 0 });
   const [minGap, setMinGap] = useState(Math.max(2, Math.round(Math.min(image.width, image.height) / 200)));
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -102,6 +108,18 @@ export function SheetSlicerModal({
   // first open: guess the grid from auto-detection, preselect the first row
   useEffect(() => {
     const r = groupRows(autoRects);
+    if (initial) {
+      // Animation mode: take every detected frame if the count matches, otherwise fall back to the requested grid
+      const st = ANIMATION_STATES.find((x) => x.value === initial.state);
+      if (st) setFps(st.fps);
+      setGrid((g) => ({ ...g, rows: initial.rows, cols: initial.cols }));
+      if (autoRects.length === initial.frames) setSelected(new Set(r.flat()));
+      else {
+        setMethod("grid");
+        setSelected(new Set(Array.from({ length: initial.cols * initial.rows }, (_, i) => i)));
+      }
+      return;
+    }
     if (r.length) {
       setGrid((g) => ({ ...g, rows: r.length, cols: Math.max(...r.map((x) => x.length)) }));
       setSelected(new Set(r[0]));
@@ -247,6 +265,7 @@ export function SheetSlicerModal({
     doc.frames = anim.frames.map((pixels) => ({ id: uid("f"), duration, cels: { [layerId]: pixels } }));
     doc.palette = anim.palette;
     doc.anchor = { ...preset.footAnchor };
+    if (masterRef) doc.masterRef = masterRef;
     const st = ANIMATION_STATES.find((x) => x.value === clipState)!;
     doc.animations = [{ id: uid("tag"), name: clipName.trim() || st.label, state: clipState, from: 0, to: anim.frames.length - 1, fps, loop: st.loop }];
     doc.name = `${name} - ${clipName.trim() || st.label}`;

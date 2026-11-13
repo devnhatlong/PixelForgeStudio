@@ -812,3 +812,49 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .modal-xl .slicer-actions { position: sticky; bottom: 0; z-index: 2; margin-top: 16px; padding: 12px 0 2px; background: linear-gradient(rgba(17,17,22,0), var(--bg-2) 18%); }
 .modal-xl .anim-preview { max-height: 46vh; }
 @media (max-width: 1100px) { .modal.modal-xl { height: auto; } .modal-xl .modal-body { overflow: auto; display: block; } .modal-xl .slicer { grid-template-columns: 1fr; height: auto; } .modal-xl .slicer-stage { height: 60vh; } .modal-xl .slicer-side { height: auto; overflow: visible; } }
+
+/* ---------- animation mode ---------- */
+.mode-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mode-card { flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px; }
+.mode-card .mode-icon { width: 28px; height: 28px; }
+.mode-texts { width: 100%; }
+.anim-setup { margin-top: 4px; }
+.anim-cut-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; }
+.anim-hint { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 28px 20px; margin-top: 8px; border: 1px dashed var(--border-2); border-radius: 14px; color: var(--text-2); }
+.anim-hint svg { color: var(--accent-2); }
+.anim-hint strong { color: var(--text); font-size: 15px; }
+.anim-hint ol { text-align: left; margin: 4px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; }
+.master-todo { align-items: flex-start; }
+.master-todo > svg { margin-top: 2px; }
+.master-todo ul { margin: 4px 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+
+/* editor: make the sprite status chip read as a button */
+.chip.status-chip { height: 26px; padding: 0 4px 0 9px; gap: 6px; font-size: 12px; transition: border-color .15s, filter .15s; }
+.chip.status-chip:hover { border-color: var(--accent); filter: brightness(1.15); }
+.status-cta { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; background: var(--grad); color: #fff; font-weight: 600; font-size: 11px; white-space: nowrap; }
+.chip.status-chip.draft .status-cta { animation: cta-pulse 2.4s ease-in-out infinite; }
+@keyframes cta-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(47,211,207,0); } 50% { box-shadow: 0 0 0 4px rgba(47,211,207,.25); } }
+
+/* editor stage: pinned status overlays above the scrolling canvas */
+.stage-frame { position: relative; min-width: 0; min-height: 0; display: flex; overflow: hidden; background: var(--bg); }
+.stage-frame > .stage { flex: 1; min-width: 0; min-height: 0; }
+.stage-frame > .stage-status { position: absolute; z-index: 20; bottom: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.45); backdrop-filter: blur(6px); background: rgba(23,23,29,.92); }
+.stage-frame > .stage-status.left { left: 14px; }
+.stage-frame > .stage-status.right { right: 18px; }
+
+/* review modal: wide, preview pinned while the side column scrolls */
+.modal-review .modal-body { padding: 16px 22px 20px; }
+.modal-review .review-body { grid-template-columns: minmax(0, 1.35fr) minmax(380px, 1fr); gap: 28px; align-items: start; }
+.modal-review .review-preview { position: sticky; top: 0; align-self: start; }
+.modal-review .review-preview .pv-stage { min-height: min(62vh, 640px); max-height: 70vh; }
+@media (max-width: 1000px) { .modal-review .review-body { grid-template-columns: 1fr; } .modal-review .review-preview { position: static; } }
+.dna-saved { font-size: 12px; color: #86efac; align-self: center; }
+
+/* flex columns: never shrink children (labels with overflow:hidden were squeezed to half height); the column scrolls instead */
+.slicer-side > *, .review-side > *, .dna-card > *, .dna-editor > *, .assistant-list > *, .forge-actions > * { flex-shrink: 0; }
+.slicer-side .field-label { min-height: 16px; overflow: visible; text-overflow: clip; }
+.slicer-side .field-label:first-of-type { margin-top: 14px; }
+
+/* sheet slicer: wider control column, sheet view gets the rest */
+.modal-xl .slicer { grid-template-columns: minmax(0, 1fr) clamp(420px, 34vw, 560px); }
+.modal-xl .anim-preview { min-height: 240px; }

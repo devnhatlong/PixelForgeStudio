@@ -44,6 +44,8 @@ export interface PixelDocument {
   animations?: AnimationTag[];
   /** pivot / feet position used by alignment tools when the doc has no sprite meta */
   anchor?: { x: number; y: number };
+  /** master sprite this animation was made from (ghost overlay, DNA) */
+  masterRef?: string;
   id: string;
   name: string;
   width: number;

@@ -128,3 +128,18 @@ describe("per-request model / quality", () => {
     expect(validateGenerate({ prompt: "hero", quality: "ultra" }, {}, limits).ok).toBe(false);
   });
 });
+
+describe("animation mode", () => {
+  it("requires a reference and refuses a mask", () => {
+    expect(validateGenerate({ mode: "animation", prompt: "idle sheet" }, {}, limits).ok).toBe(false);
+    const ref = file(png());
+    expect(validateGenerate({ mode: "animation", prompt: "idle sheet" }, { reference: ref }, limits).ok).toBe(true);
+    expect(validateGenerate({ mode: "animation", prompt: "idle sheet" }, { reference: ref, mask: ref }, limits).ok).toBe(false);
+  });
+  it("mock returns a 3×2 sheet built from the reference", async () => {
+    const r = await new MockProvider().generate({ mode: "animation", prompt: "x", count: 1, aspect: { width: 1536, height: 1024 }, seed: 1, reference: { buffer: drawMockCharacter(3), mime: "image/png" } });
+    const sheet = PNG.sync.read(r.images[0].buffer);
+    expect(sheet.width).toBe(768);
+    expect(sheet.height).toBe(2 * 384);
+  });
+});

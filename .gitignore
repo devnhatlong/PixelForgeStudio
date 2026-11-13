@@ -6,3 +6,4 @@ dist/
 *.tsbuildinfo
 server/storage/
 server/server.log
+.next-check/

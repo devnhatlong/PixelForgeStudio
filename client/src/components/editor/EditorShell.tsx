@@ -122,6 +122,7 @@ export function EditorShell() {
             >
               <BadgeCheck size={12} /> {doc.sprite.kind === "master" ? "Master" : `Variant ${doc.sprite.outfit}`} · {STATUS_LABEL[doc.sprite.status]}
               {isEditedAfterApproval(doc) ? " (đã sửa)" : ""}
+              <span className="status-cta">{doc.sprite.kind === "master" ? "Duyệt & DNA" : "Duyệt"} ›</span>
             </button>
           )}
           <span className={`save-dot ${dirty ? "dirty" : ""}`} title={dirty ? "Đang chờ lưu…" : savedAt ? `Đã lưu ${new Date(savedAt).toLocaleTimeString("vi-VN")}` : "Đã lưu"} />
@@ -154,9 +155,12 @@ export function EditorShell() {
 
       <div className="editor-body">
         <Toolbar />
-        <div className={`stage ${tool === "hand" ? "hand" : ""}`}>
-          <div className="canvas-wrap">
-            <PixelCanvas />
+        {/* stage-frame doesn't scroll: the status overlays stay pinned while .stage (the scroller) moves the canvas */}
+        <div className="stage-frame">
+          <div className={`stage ${tool === "hand" ? "hand" : ""}`}>
+            <div className="canvas-wrap">
+              <PixelCanvas />
+            </div>
           </div>
           <div className="stage-status left">
             <span className="chip">{doc.width}x{doc.height} px</span>

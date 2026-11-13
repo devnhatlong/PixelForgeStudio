@@ -65,7 +65,7 @@ export class OpenAiProvider implements ImageProvider {
     let res: Response;
     try {
       // input images: the character to keep first (the mask applies to the first image), then style examples
-      const inputs = [...(req.mode === "variant" && req.reference ? [{ img: req.reference, name: "reference" }] : []), ...(req.styleRefs ?? []).map((img, i) => ({ img, name: `style_${i + 1}` }))];
+      const inputs = [...((req.mode === "variant" || req.mode === "animation") && req.reference ? [{ img: req.reference, name: "reference" }] : []), ...(req.styleRefs ?? []).map((img, i) => ({ img, name: `style_${i + 1}` }))];
       if (inputs.length) {
         if (this.cfg.inputFidelity) params.input_fidelity = this.cfg.inputFidelity;
         const form = new FormData();

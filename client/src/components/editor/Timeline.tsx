@@ -114,7 +114,7 @@ export function Timeline() {
   }, [doc]);
 
   // ghost source
-  const masterId = doc?.sprite?.masterId ?? null;
+  const masterId = doc?.sprite?.masterId ?? doc?.masterRef ?? null;
   useEffect(() => {
     let cancelled = false;
     (async () => {

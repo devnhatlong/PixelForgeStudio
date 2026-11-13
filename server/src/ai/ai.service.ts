@@ -158,7 +158,7 @@ export class AiService {
           referenceUsed,
           maskUsed,
           styleRefsUsed: caps.styleReference ? styleRefs.length : 0,
-          structureConditioned: req.mode === "variant" && referenceUsed,
+          structureConditioned: (req.mode === "variant" || req.mode === "animation") && referenceUsed,
           warnings: [...warnings, ...result.warnings],
           params: { ...result.params, mode: req.mode, aspect: req.aspect, attempt: attempt + 1 },
           estimatedCostUsd: +(count * l.costPerImage).toFixed(4),
