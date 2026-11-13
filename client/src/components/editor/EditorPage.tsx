@@ -29,7 +29,7 @@ export function EditorPage({ id }: { id: string }) {
       // leaving another project: persist it before switching
       const current = useEditorStore.getState();
       if (current.doc && current.dirty) {
-        await saveProject(current.doc).catch(() => {});
+        await saveProject(current.doc).catch(() => { });
         pushDocument(current.doc);
       }
       const next = await ensureLocalDocument(id).catch(() => undefined);
@@ -46,7 +46,7 @@ export function EditorPage({ id }: { id: string }) {
 
   // keep the browser tab title in sync
   useEffect(() => {
-    if (doc && status === "ready") document.title = `${dirty ? "● " : ""}${doc.name} — PixelForge Studio`;
+    if (doc && status === "ready") document.title = `${dirty ? "● " : ""}${doc.name} - PixelForge Studio`;
     return () => {
       document.title = "PixelForge Studio";
     };

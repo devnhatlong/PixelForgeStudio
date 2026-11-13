@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types, isValidObjectId } from "mongoose";
 import { Project, ProjectDocument } from "./project.schema";
+import { spriteSummary } from "./sprite-summary";
 
 export interface UpsertProjectDto {
   clientId: string;
@@ -28,6 +29,7 @@ export interface ProjectMetaDto {
 }
 
 const SUMMARY = "-data";
+
 const MAX_DATA_BYTES = 8 * 1024 * 1024;
 
 @Injectable()
@@ -65,6 +67,7 @@ export class ProjectsService {
       data: dto.data,
       docUpdatedAt,
       updatedAt: now,
+      sprite: spriteSummary(dto.data),
     };
     if (dto.folderId !== undefined) $set.folderId = dto.folderId || null;
     if (dto.deleted !== undefined) {

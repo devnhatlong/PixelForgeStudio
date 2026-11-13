@@ -39,6 +39,8 @@ type EditorState = {
   loadDocument: (doc: PixelDocument) => void;
   closeDocument: () => void;
   renameDocument: (name: string) => void;
+  /** replace document-level metadata (e.g. sprite status) without touching undo history */
+  updateDocumentMeta: (fn: (doc: PixelDocument) => PixelDocument) => void;
   markSaved: () => void;
 
   setTool: (tool: EditorTool) => void;
@@ -149,6 +151,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   closeDocument: () => set({ doc: null, history: [], future: [], selection: null, floating: null, playing: false }),
   renameDocument: (name) => set((s) => (s.doc ? { doc: { ...s.doc, name, updatedAt: Date.now() }, dirty: true } : s)),
+  updateDocumentMeta: (fn) =>
+    set((s) => {
+      if (!s.doc) return s;
+      const doc = fn(s.doc);
+      // keep metadata consistent across undo/redo snapshots so undo never reverts an approval
+      const patch = (d: PixelDocument) => ({ ...d, sprite: doc.sprite, name: doc.name });
+      return { doc: { ...doc, updatedAt: Date.now() }, history: s.history.map(patch), future: s.future.map(patch), dirty: true };
+    }),
   markSaved: () => set({ dirty: false }),
 
   setTool: (tool) => {

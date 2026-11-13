@@ -16,7 +16,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean }) {
 
   if (!user) {
     return (
-      <span className="sync-badge offline" title="Chưa đăng nhập — project chỉ lưu trên trình duyệt này">
+      <span className="sync-badge offline" title="Chưa đăng nhập - project chỉ lưu trên trình duyệt này">
         <CloudOff size={13} /> {!compact && "Chỉ lưu cục bộ"}
       </span>
     );
@@ -25,13 +25,13 @@ export function SyncBadge({ compact = false }: { compact?: boolean }) {
     return <span className="sync-badge syncing" title="Đang đồng bộ lên Cloud…"><Spinner size={13} /> {!compact && "Đang đồng bộ"}</span>;
   if (status === "pending")
     return (
-      <button className="sync-badge pending" title={`${pending} thay đổi chờ đồng bộ — bấm để đồng bộ ngay`} onClick={() => flush()}>
+      <button className="sync-badge pending" title={`${pending} thay đổi chờ đồng bộ - bấm để đồng bộ ngay`} onClick={() => flush()}>
         <CloudUpload size={13} /> {!compact && `Chờ đồng bộ (${pending})`}
       </button>
     );
   if (status === "error")
     return (
-      <button className="sync-badge error" title={`Lỗi đồng bộ: ${lastError ?? ""} — bấm để thử lại`} onClick={() => flush()}>
+      <button className="sync-badge error" title={`Lỗi đồng bộ: ${lastError ?? ""} - bấm để thử lại`} onClick={() => flush()}>
         <AlertCircle size={13} /> {!compact && "Lỗi đồng bộ"}
       </button>
     );
@@ -41,5 +41,5 @@ export function SyncBadge({ compact = false }: { compact?: boolean }) {
         <CheckCircle2 size={13} /> {!compact && "Đã đồng bộ Cloud"}
       </span>
     );
-  return <span className="sync-badge idle" title="Đã đăng nhập — thay đổi sẽ tự lưu lên Cloud"><Cloud size={13} /> {!compact && "Cloud"}</span>;
+  return <span className="sync-badge idle" title="Đã đăng nhập - thay đổi sẽ tự lưu lên Cloud"><Cloud size={13} /> {!compact && "Cloud"}</span>;
 }

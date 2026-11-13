@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
-export type HomeView = "recent" | "marketplace" | "trash";
-export type ModalKind = "newSprite" | "auth" | "export" | "pngToPixel" | "cloud" | "publish" | null;
+export type HomeView = "recent" | "sprites" | "marketplace" | "trash";
+export type ModalKind = "newSprite" | "auth" | "export" | "pngToPixel" | "cloud" | "publish" | "spriteReview" | "aiSettings" | null;
 
 type AppState = {
   homeView: HomeView;

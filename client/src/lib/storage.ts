@@ -1,12 +1,15 @@
 import type { Folder, PixelDocument, ProjectSummary } from "@/types/editor";
 import { makeThumbnail } from "./raster";
 import { normalizeDocument, uid } from "./document";
+import { toSpriteSummary } from "./sprite/meta";
 
 const DB_NAME = "pixelforge";
-const DB_VERSION = 2;
+// v3: + "assets" (source / cleaned / mask images of the sprite pipeline). Upgrades only add stores.
+const DB_VERSION = 3;
 const STORE_PROJECTS = "projects";
 const STORE_DOCS = "documents";
 const STORE_FOLDERS = "folders";
+const STORE_ASSETS = "assets";
 
 interface StoredDoc {
   id: string;
@@ -22,6 +25,7 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_PROJECTS)) db.createObjectStore(STORE_PROJECTS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(STORE_DOCS)) db.createObjectStore(STORE_DOCS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(STORE_FOLDERS)) db.createObjectStore(STORE_FOLDERS, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -58,6 +62,7 @@ export async function saveProject(doc: PixelDocument, extra?: Partial<ProjectSum
     deleted: extra?.deleted ?? existing?.deleted ?? false,
     folderId: extra?.folderId !== undefined ? extra.folderId : existing?.folderId ?? null,
     cloudOnly: false,
+    sprite: toSpriteSummary(doc),
   };
   await tx(STORE_DOCS, "readwrite", (s) => s.put({ id: doc.id, doc } satisfies StoredDoc));
   await tx(STORE_PROJECTS, "readwrite", (s) => s.put(summary));
@@ -144,4 +149,34 @@ export async function deleteFolder(id: string): Promise<void> {
   const projects = await listProjects();
   for (const p of projects) if (p.folderId === id) await updateSummary(p.id, { folderId: null });
   await tx(STORE_FOLDERS, "readwrite", (s) => s.delete(id));
+}
+
+/* ---------------- binary assets (sprite pipeline) ---------------- */
+
+export type AssetKind = "source" | "cleaned" | "mask" | "reference";
+
+export interface StoredAsset {
+  id: string;
+  kind: AssetKind;
+  mime: string;
+  width: number;
+  height: number;
+  blob: Blob;
+  createdAt: number;
+  /** uploaded to the server's asset storage */
+  remote?: boolean;
+}
+
+/** Assets are immutable: a pipeline re-run creates new derived assets, the source is never overwritten. */
+export async function putAsset(asset: StoredAsset): Promise<void> {
+  await tx(STORE_ASSETS, "readwrite", (s) => s.put(asset));
+}
+
+export async function getAssetLocal(id: string): Promise<StoredAsset | undefined> {
+  return tx<StoredAsset | undefined>(STORE_ASSETS, "readonly", (s) => s.get(id));
+}
+
+export async function markAssetRemote(id: string): Promise<void> {
+  const a = await getAssetLocal(id);
+  if (a) await putAsset({ ...a, remote: true });
 }

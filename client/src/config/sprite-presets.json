@@ -1,0 +1,32 @@
+{
+  "presets": [
+    {
+      "id": "HY_CHARACTER_V1",
+      "version": 1,
+      "name": "Huyền Ấn - Nhân vật v1",
+      "description": "Chibi cổ phong phương Đông, full body, 3/4 sang phải, đứng trung tính. Giá trị thử nghiệm - xác nhận lại ở 1× trong scene mẫu.",
+      "canvas": {
+        "width": 128,
+        "height": 192
+      },
+      "footAnchor": {
+        "x": 64,
+        "y": 174
+      },
+      "contentHeight": 120,
+      "paletteId": null,
+      "maxColors": 28,
+      "alphaThreshold": 128,
+      "resizeMethod": "box",
+      "defaultView": "right_3quarter",
+      "defaultPose": "neutral_idle",
+      "stylePrompt": "pixel art game sprite, chibi proportions with head about one third of total height, ancient Eastern wuxia costume, full body, single character, three-quarter view facing right, standing neutral idle pose, feet visible on the ground, clean dark outline, flat cel shading, limited palette, plain solid white background, no text, no frame, no shadow on the ground, no poster effects",
+      "negativePrompt": "text, watermark, logo, background scenery, multiple characters, cropped feet, cut off head, blurry, gradient background, photorealistic, 3d render",
+      "checks": {
+        "maxAnchorOffsetPx": 2,
+        "maxStrayClusterSize": 2,
+        "edgeMarginPx": 1
+      }
+    }
+  ]
+}

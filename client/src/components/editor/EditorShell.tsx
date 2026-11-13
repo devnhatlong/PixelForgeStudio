@@ -16,6 +16,8 @@ import { downloadPforge } from "@/lib/pforge";
 import { useProjectActions } from "@/hooks/useProjectActions";
 import { flush, pushDocument } from "@/lib/sync";
 import { SyncBadge } from "@/components/ui/SyncBadge";
+import { BadgeCheck } from "lucide-react";
+import { isEditedAfterApproval, STATUS_LABEL } from "@/lib/sprite/meta";
 
 export function EditorShell() {
   const doc = useEditorStore((s) => s.doc);
@@ -83,7 +85,7 @@ export function EditorShell() {
 
   const goHome = async () => {
     if (dirty) {
-      await saveProject(doc).catch(() => {});
+      await saveProject(doc).catch(() => { });
       markSaved();
       pushDocument(doc);
     }
@@ -112,6 +114,16 @@ export function EditorShell() {
             <span className="doc-name" onDoubleClick={() => setEditingName(true)} title="Nhấp đúp để đổi tên">{doc.name}</span>
           )}
           <span className="chip">{doc.width}x{doc.height}</span>
+          {doc.sprite && (
+            <button
+              className={`chip status-chip ${doc.sprite.status} ${isEditedAfterApproval(doc) ? "stale" : ""}`}
+              onClick={() => openModal("spriteReview")}
+              title="Review & Approve: kiểm tra chất lượng, đổi trạng thái, export PNG + JSON"
+            >
+              <BadgeCheck size={12} /> {doc.sprite.kind === "master" ? "Master" : `Variant ${doc.sprite.outfit}`} · {STATUS_LABEL[doc.sprite.status]}
+              {isEditedAfterApproval(doc) ? " (đã sửa)" : ""}
+            </button>
+          )}
           <span className={`save-dot ${dirty ? "dirty" : ""}`} title={dirty ? "Đang chờ lưu…" : savedAt ? `Đã lưu ${new Date(savedAt).toLocaleTimeString("vi-VN")}` : "Đã lưu"} />
         </div>
         <SyncBadge compact />
@@ -133,7 +145,7 @@ export function EditorShell() {
           <button className="btn-ghost" disabled={!user} title={user ? "" : "Đăng nhập để đăng Marketplace"} onClick={() => openModal("publish")}><Store size={15} /> Đăng Marketplace</button>
           <button className="btn-accent" onClick={() => openModal("export")}><Download size={15} /> Xuất File</button>
           {user ? (
-            <button className="btn-ghost" onClick={logout} title={`${user.email} — Đăng xuất`}><LogOut size={15} /> {user.name}</button>
+            <button className="btn-ghost" onClick={logout} title={`${user.email} - Đăng xuất`}><LogOut size={15} /> {user.name}</button>
           ) : (
             <button className="btn-ghost" onClick={() => openModal("auth")}><User size={15} /> Đăng nhập</button>
           )}

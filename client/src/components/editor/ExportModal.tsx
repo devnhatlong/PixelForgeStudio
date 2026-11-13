@@ -131,7 +131,7 @@ export function ExportModal({ onClose }: { onClose: () => void }) {
               <div className="muted small preview-caption">
                 {tab === "png" && `Kích thước xuất: ${doc.width * pngScale} x ${doc.height * pngScale} px (${pngScale}x)`}
                 {tab === "gif" && `${doc.frames.length} Khung hình | timing theo từng frame | ${doc.width * gifScale}x${doc.height * gifScale} px`}
-                {tab === "sheet" && `Sprite Atlas Tối Ưu Cho Game Engine — ${sheetInfo.cols} cột x ${sheetInfo.rows} hàng`}
+                {tab === "sheet" && `Sprite Atlas Tối Ưu Cho Game Engine - ${sheetInfo.cols} cột x ${sheetInfo.rows} hàng`}
               </div>
             </>
           )}

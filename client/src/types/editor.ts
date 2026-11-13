@@ -1,3 +1,5 @@
+import type { SpriteMeta, SpriteSummary } from "./sprite";
+
 export type EditorTool =
   | "pencil"
   | "eraser"
@@ -36,6 +38,8 @@ export interface Frame {
 }
 
 export interface PixelDocument {
+  /** optional sprite-pipeline metadata (master/variant); absent on ordinary projects */
+  sprite?: SpriteMeta;
   id: string;
   name: string;
   width: number;
@@ -87,4 +91,6 @@ export interface ProjectSummary {
   cloudId?: string;
   /** summary came from the cloud; pixel data not yet downloaded */
   cloudOnly?: boolean;
+  /** present when the project is a pipeline sprite (master/variant) */
+  sprite?: SpriteSummary;
 }

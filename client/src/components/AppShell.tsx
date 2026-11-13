@@ -12,6 +12,8 @@ import { ExportModal } from "./editor/ExportModal";
 import { CloudModal } from "./cloud/CloudModal";
 import { PublishModal } from "./cloud/PublishModal";
 import { LoadingOverlay } from "./ui/Loading";
+import { SpriteReviewModal } from "./sprite/SpriteReviewModal";
+import { AiSettingsModal } from "./sprite/AiSettingsModal";
 import { flush, listUnsynced, pullAll, uploadAllLocal } from "@/lib/sync";
 import { useSyncStore } from "@/store/sync-store";
 
@@ -89,6 +91,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {modal === "export" && <ExportModal onClose={closeModal} />}
       {modal === "cloud" && <CloudModal onClose={closeModal} />}
       {modal === "publish" && <PublishModal onClose={closeModal} />}
+      {modal === "spriteReview" && <SpriteReviewModal onClose={closeModal} />}
+      {modal === "aiSettings" && <AiSettingsModal onClose={closeModal} />}
       {loading && <LoadingOverlay label={loading} />}
       {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}
     </>

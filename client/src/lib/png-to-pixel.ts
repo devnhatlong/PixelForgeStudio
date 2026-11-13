@@ -2,6 +2,8 @@ import type { PixelDocument } from "@/types/editor";
 import { createDocument } from "./document";
 import { colorDistance, hexToRgb, rgbToHex } from "./color";
 
+export type ResizeMethod = "box" | "nearest";
+
 export interface ConvertOptions {
   width: number;
   height: number;
@@ -9,9 +11,18 @@ export interface ConvertOptions {
   /** optional fixed palette to snap to */
   palette?: string[] | null;
   alphaThreshold: number; // 0..255
+  /** "box" (area average, default - best for painted/AI images) or "nearest" (keeps hard pixel edges) */
+  resizeMethod?: ResizeMethod;
 }
 
-export function loadImage(file: File): Promise<HTMLImageElement> {
+/** Minimal RGBA raster, structurally compatible with the DOM ImageData. */
+export interface RgbaImage {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+
+export function loadImage(file: File | Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -19,15 +30,28 @@ export function loadImage(file: File): Promise<HTMLImageElement> {
       URL.revokeObjectURL(url);
       resolve(img);
     };
-    img.onerror = () => reject(new Error("Không đọc được ảnh"));
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Không đọc được ảnh"));
+    };
     img.src = url;
   });
+}
+
+/** Read the full-resolution RGBA pixels of an image (browser only). */
+export function imageToRgba(img: HTMLImageElement): RgbaImage {
+  const src = document.createElement("canvas");
+  src.width = img.naturalWidth;
+  src.height = img.naturalHeight;
+  const sctx = src.getContext("2d", { willReadFrequently: true })!;
+  sctx.drawImage(img, 0, 0);
+  return sctx.getImageData(0, 0, src.width, src.height);
 }
 
 type RGB = [number, number, number];
 
 /** Median-cut quantization to at most maxColors colors. */
-function medianCut(colors: RGB[], maxColors: number): RGB[] {
+export function medianCut(colors: RGB[], maxColors: number): RGB[] {
   if (colors.length <= maxColors) return dedupe(colors);
   let buckets: RGB[][] = [colors];
   while (buckets.length < maxColors) {
@@ -55,6 +79,7 @@ function medianCut(colors: RGB[], maxColors: number): RGB[] {
     const mid = Math.floor(b.length / 2);
     buckets.splice(bestIdx, 1, b.slice(0, mid), b.slice(mid));
   }
+  buckets = buckets.filter((b) => b.length > 0);
   return buckets.map((b) => {
     const sum = [0, 0, 0];
     for (const px of b) {
@@ -92,21 +117,28 @@ function nearest(c: RGB, palette: RGB[]): RGB {
   return best;
 }
 
-export function imageToPixels(img: HTMLImageElement, opts: ConvertOptions): { pixels: string[]; palette: string[] } {
+/**
+ * Downscale + quantize an RGBA raster into pixel-art cells. Pure (no DOM), so it runs in tests and workers.
+ * Each output pixel is "#rrggbb" or "" (transparent).
+ */
+export function pixelizeRgba(src: RgbaImage, opts: ConvertOptions): { pixels: string[]; palette: string[] } {
   const { width, height } = opts;
-  const src = document.createElement("canvas");
-  src.width = img.naturalWidth;
-  src.height = img.naturalHeight;
-  const sctx = src.getContext("2d")!;
-  sctx.drawImage(img, 0, 0);
-  const data = sctx.getImageData(0, 0, src.width, src.height).data;
-
-  // box-filter downsample
+  const data = src.data;
   const cells: (RGB | null)[] = [];
   const cw = src.width / width;
   const ch = src.height / height;
+  const nearestMode = opts.resizeMethod === "nearest";
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
+      if (nearestMode) {
+        const sx = Math.min(src.width - 1, Math.floor((x + 0.5) * cw));
+        const sy = Math.min(src.height - 1, Math.floor((y + 0.5) * ch));
+        const i = (sy * src.width + sx) * 4;
+        if (data[i + 3] < opts.alphaThreshold) cells.push(null);
+        else cells.push([data[i], data[i + 1], data[i + 2]]);
+        continue;
+      }
+      // box-filter (alpha-weighted area average)
       const x0 = Math.floor(x * cw);
       const x1 = Math.max(x0 + 1, Math.floor((x + 1) * cw));
       const y0 = Math.floor(y * ch);
@@ -126,16 +158,20 @@ export function imageToPixels(img: HTMLImageElement, opts: ConvertOptions): { pi
           a += al;
           n++;
         }
-      if (n === 0 || a / n < opts.alphaThreshold) cells.push(null);
+      if (n === 0 || a === 0 || a / n < opts.alphaThreshold) cells.push(null);
       else cells.push([r / a, g / a, b / a]);
     }
   }
 
   const opaque = cells.filter((c): c is RGB => !!c).map((c) => [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])] as RGB);
   const palette: RGB[] = opts.palette && opts.palette.length ? opts.palette.map((h) => hexToRgb(h)) : medianCut(opaque, opts.maxColors);
-  const pixels = cells.map((c) => (c ? rgbToHex(...nearest(c, palette)) : ""));
+  const pixels = palette.length ? cells.map((c) => (c ? rgbToHex(...nearest(c, palette)) : "")) : cells.map(() => "");
   const used = Array.from(new Set(pixels.filter(Boolean)));
   return { pixels, palette: used };
+}
+
+export function imageToPixels(img: HTMLImageElement, opts: ConvertOptions): { pixels: string[]; palette: string[] } {
+  return pixelizeRgba(imageToRgba(img), opts);
 }
 
 export function imageToDocument(img: HTMLImageElement, name: string, opts: ConvertOptions): PixelDocument {

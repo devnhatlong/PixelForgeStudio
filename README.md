@@ -72,6 +72,17 @@ API tại `http://localhost:4000/api/v1`.
 
 **Cloud & Marketplace** (cần đăng nhập): lưu/mở/xóa project trên server, đăng sprite lên Marketplace kèm mô tả + tags, người khác tải về và mở thành bản sao.
 
+**Sprite Forge** (`/forge`) & **Sprite Library**: pipeline tạo nhân vật Master → Variant (AI qua server hoặc nhập ảnh) → xóa nền → normalize theo foot anchor → pixel hóa theo preset → kiểm tra tự động → Draft/Reviewed/Approved → export PNG trong suốt + JSON manifest cho Unity. Xem [docs/SPRITE_FORGE.md](docs/SPRITE_FORGE.md).
+
+| Method | Endpoint | Mô tả |
+| --- | --- | --- |
+| GET | `/ai/info` | Provider, khả năng, hạn mức (không lộ key) |
+| POST | `/ai/generate` | multipart: `mode, prompt, count, width, height, seed` + `reference`, `mask` → ảnh base64 |
+| POST | `/assets` | Upload ảnh nguồn bất biến (đăng nhập) |
+| GET | `/assets/:id` | Tải ảnh nguồn (chủ sở hữu) |
+
+Test: `cd client && npm test` · `cd server && npm test`.
+
 ## Định dạng `.pforge`
 
 JSON: `{ magic: "PFORGE", version: 1, document: PixelDocument }`. `PixelDocument` gồm `width`, `height`, `layers[]` (metadata), `frames[]` với `cels` = map `layerId → string[]` (mỗi pixel là `"#rrggbb"` hoặc `""` trong suốt), `palette[]`.

@@ -26,6 +26,7 @@ import {
   deleteFolderLocalOnly,
 } from "./storage";
 import type { Folder, PixelDocument, ProjectSummary } from "@/types/editor";
+import type { SpriteSummary } from "@/types/sprite";
 
 const PUSH_DEBOUNCE_MS = 1500;
 const RETRY_MS = 15_000;
@@ -152,7 +153,7 @@ export async function pullAll(): Promise<boolean> {
   sync()({ status: "syncing", lastError: null });
   try {
     const [cloudProjects, cloudFolders, localProjects, localFolders] = await Promise.all([
-      api.get<(CloudProject & { docUpdatedAt?: number; folderId?: string | null; deleted?: boolean; deletedAt?: number | null })[]>("/projects"),
+      api.get<(CloudProject & { docUpdatedAt?: number; folderId?: string | null; deleted?: boolean; deletedAt?: number | null; sprite?: SpriteSummary | null })[]>("/projects"),
       api.get<CloudFolder[]>("/folders"),
       listProjects(),
       listFolders(),
@@ -192,6 +193,7 @@ export async function pullAll(): Promise<boolean> {
           deletedAt: cp.deletedAt ?? undefined,
           cloudId: cp._id,
           cloudOnly: true,
+          sprite: cp.sprite ?? undefined,
         });
         changed = true;
       } else if (cloudDocTime > lp.updatedAt) {

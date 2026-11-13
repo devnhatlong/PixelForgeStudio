@@ -35,7 +35,7 @@ export class Project {
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
   data: Record<string, unknown>;
 
-  /** the PixelDocument's own updatedAt (client clock) — used for last-write-wins merging */
+  /** the PixelDocument's own updatedAt (client clock) - used for last-write-wins merging */
   @Prop({ type: Number, default: 0, index: true })
   docUpdatedAt: number;
 
@@ -66,6 +66,10 @@ export class Project {
 
   @Prop({ type: Number, required: true, default: () => Date.now(), index: true })
   updatedAt: number;
+
+  /** small sprite-pipeline summary copied from data.sprite (kind, characterId, status…) for list views; null for ordinary projects */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: null })
+  sprite: Record<string, unknown> | null;
 
   /** when the project was (last) published to the marketplace */
   @Prop({ type: Number })

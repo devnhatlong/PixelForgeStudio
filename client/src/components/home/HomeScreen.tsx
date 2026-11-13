@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   User, FilePlus2, FolderOpen, ImageDown, Home, Store, Trash2, LayoutGrid, List, ArrowDown, ArrowUp,
-  RefreshCw, RotateCcw, X, FolderInput, type LucideIcon,
+  RefreshCw, RotateCcw, X, FolderInput, Wand2, Swords, Bot, type LucideIcon,
 } from "lucide-react";
 import { useAppStore, type HomeView } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
@@ -18,6 +18,7 @@ import { normalizeDocument, uid } from "@/lib/document";
 import { useProjectActions } from "@/hooks/useProjectActions";
 import type { Folder, PixelDocument, ProjectSummary } from "@/types/editor";
 import { LoadingBlock, ProjectGridSkeleton, Spinner } from "@/components/ui/Loading";
+import { SpriteLibrary } from "@/components/sprite/SpriteLibrary";
 
 function timeAgo(ts: number) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -42,6 +43,7 @@ export function HomeScreen() {
   const authReady = useAuthStore((s) => s.ready);
   const logout = useAuthStore((s) => s.logout);
   const { pickPforge } = useProjectActions();
+  const router = useRouter();
 
   const NavItem = ({ view, icon: Icon, label }: { view: HomeView; icon: LucideIcon; label: string }) => (
     <button className={`nav-item ${homeView === view ? "active" : ""}`} onClick={() => setHomeView(view)}>
@@ -69,9 +71,12 @@ export function HomeScreen() {
           <button className="nav-item" onClick={() => openModal("newSprite")}><span className="nav-icon"><FilePlus2 size={16} /></span><span className="nav-label">New file</span></button>
           <button className="nav-item" onClick={pickPforge}><span className="nav-icon"><FolderOpen size={16} /></span><span className="nav-label">Open</span></button>
           <button className="nav-item" onClick={() => openModal("pngToPixel")}><span className="nav-icon"><ImageDown size={16} /></span><span className="nav-label">PNG to Pixel</span></button>
+          <button className="nav-item" onClick={() => router.push("/forge")}><span className="nav-icon"><Wand2 size={16} /></span><span className="nav-label">Sprite Forge</span></button>
+          <button className="nav-item" onClick={() => openModal("aiSettings")}><span className="nav-icon"><Bot size={16} /></span><span className="nav-label">Cài đặt AI</span></button>
         </div>
         <div className="nav-group">
           <NavItem view="recent" icon={Home} label="Recent" />
+          <NavItem view="sprites" icon={Swords} label="Sprite Library" />
           <NavItem view="marketplace" icon={Store} label="Marketplace" />
           <NavItem view="trash" icon={Trash2} label="Recycle Bin" />
         </div>
@@ -82,6 +87,7 @@ export function HomeScreen() {
       </aside>
       <main className="home-main">
         {homeView === "recent" && <RecentView />}
+        {homeView === "sprites" && <SpriteLibrary />}
         {homeView === "trash" && <TrashView />}
         {homeView === "marketplace" && <MarketplaceView />}
       </main>
@@ -189,11 +195,11 @@ function ListHeader({
       <div className="home-head">
         <h1>{title}</h1>
         <div className="head-actions">
-        {extra}
-        <div className="seg">
-          <button className={view === "list" ? "active" : ""} onClick={() => setView("list")} title="Danh sách"><List size={15} /></button>
-          <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} title="Lưới"><LayoutGrid size={15} /></button>
-        </div>
+          {extra}
+          <div className="seg">
+            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")} title="Danh sách"><List size={15} /></button>
+            <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} title="Lưới"><LayoutGrid size={15} /></button>
+          </div>
         </div>
       </div>
       <div className="home-filter">
@@ -319,39 +325,39 @@ function RecentView() {
           </div>
         </div>
       ) : (
-      <ProjectGrid
-        items={sorted}
-        view={view}
-        loading={loading}
-        draggable
-        onOpen={(p) => openById(p.id)}
-        actions={(p) => (
-          <>
-            <button className="btn-ghost sm" onClick={() => openById(p.id)}><FolderInput size={13} /> Mở</button>
-            <select
-              className="select sm"
-              title="Chuyển vào thư mục"
-              value={p.folderId ?? ""}
-              onChange={(e) => move(p.id, e.target.value || null)}
-            >
-              <option value="">— Gần đây —</option>
-              {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
-            <button
-              className="icon-btn sm danger"
-              title="Chuyển vào thùng rác"
-              onClick={async () => {
-                await setDeleted(p.id, true);
-                pushMeta(p.id, { deleted: true, deletedAt: Date.now() });
-                notify(`Đã chuyển "${p.name}" vào Recycle Bin`);
-                refresh();
-              }}
-            >
-              <Trash2 size={13} />
-            </button>
-          </>
-        )}
-      />
+        <ProjectGrid
+          items={sorted}
+          view={view}
+          loading={loading}
+          draggable
+          onOpen={(p) => openById(p.id)}
+          actions={(p) => (
+            <>
+              <button className="btn-ghost sm" onClick={() => openById(p.id)}><FolderInput size={13} /> Mở</button>
+              <select
+                className="select sm"
+                title="Chuyển vào thư mục"
+                value={p.folderId ?? ""}
+                onChange={(e) => move(p.id, e.target.value || null)}
+              >
+                <option value="">- Gần đây -</option>
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <button
+                className="icon-btn sm danger"
+                title="Chuyển vào thùng rác"
+                onClick={async () => {
+                  await setDeleted(p.id, true);
+                  pushMeta(p.id, { deleted: true, deletedAt: Date.now() });
+                  notify(`Đã chuyển "${p.name}" vào Recycle Bin`);
+                  refresh();
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </>
+          )}
+        />
       )}
     </>
   );

@@ -47,7 +47,7 @@ export function GridMenu() {
             <input type="checkbox" checked={showGrid} onChange={toggleGrid} /> Pixel Grid <span className="muted small">(mỗi ô = 1 pixel)</span>
           </label>
 
-          <div className="popover-title">Major Grid <span className="muted small">— lớp kẻ ô phụ trợ, không ảnh hưởng ảnh</span></div>
+          <div className="popover-title">Major Grid <span className="muted small">- lớp kẻ ô phụ trợ, không ảnh hưởng ảnh</span></div>
           <div className="seg wide">
             <button className={!gridAuto && gridSize === 0 ? "active" : ""} onClick={() => setGridSize(0)}>Tắt</button>
             {PRESETS.map((n) => (
